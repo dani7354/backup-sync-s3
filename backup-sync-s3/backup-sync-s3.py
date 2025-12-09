@@ -21,7 +21,8 @@ class S3CommandError(Exception):
 @dataclasses.dataclass(frozen=True)
 class S3FileInfo:
     path: str
-    created: datetime
+    size: int
+    uploaded: datetime
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,13 +39,15 @@ class BackupLocation:
 
 class S3CmdWrapper:
     """ Wrapper for s3cmd command line utility: https://s3tools.org/"""
+    config_filename: ClassVar[str] = ".s3cfg"
 
-    def __init__(self, bucket_url: str, access_key: str, secret_key: str) -> None:
-        self._bucket_url = bucket_url
-        self._access_key = access_key
-        self._secret_key = secret_key
+    def __init__(self, bucket_name: str) -> None:
+        self._bucket_url = f"s3://{bucket_name}"
         self._tmp_directory_path = TMP_DIR_PATH
         self._s3_cmd = self._get_s3cmd_path()
+        if not self._check_s3cmd_cfg_exists():
+            raise FileNotFoundError("s3cmd configuration file not found. You need to run s3cmd --configure first!")
+
 
     class Decorator:
         @classmethod
@@ -59,15 +62,21 @@ class S3CmdWrapper:
             return inner
 
     @Decorator.catch_process_error_and_raise
-    def list_files(self, directory: str) -> list[S3FileInfo]:
-        cmd = [self._s3_cmd, "ls", f"{self._bucket_url}/{directory}"]
+    def list_files(self, path: str) -> list[S3FileInfo]:
+        cmd = [self._s3_cmd, "ls", f"{self._bucket_url}/{self._fix_path(path)}/"]
         cmd_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
         cmd_output_str = cmd_output.decode(ENCODING)
-
         file_list = []
-        for l in cmd_output_str.splitlines():
-            if l.startswith("/"):
-                file_list.append(S3FileInfo(l, datetime.now()))
+        for line in cmd_output_str.splitlines():
+            line_split = line.split()
+            if len(line_split) < 4:
+                continue
+
+            file_list.append(
+                S3FileInfo(
+                    path=line_split[-1],
+                    size=int(line_split[2]),
+                    uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M")))
 
         return file_list
 
@@ -76,28 +85,41 @@ class S3CmdWrapper:
         if not os.path.isdir(local_directory_path):
             raise ValueError(f"Local directory path {local_directory_path} does not exist")
 
-        filename = file_path.split("/")[-1]
-        local_file_path = os.path.join(local_directory_path, filename)
-        cmd = [
-            self._s3_cmd,
-            "--progress"
-            "get", f"{self._bucket_url}/{file_path}", local_directory_path]
-        cmd_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        new_local_file_path = os.path.join(local_directory_path, os.path.split(file_path)[-1])
+        if os.path.isfile(new_local_file_path):
+            raise FileExistsError(f"File {new_local_file_path} already exists locally!")
 
-        return local_file_path
+        cmd = [self._s3_cmd, "--progress", "get", f"{self._bucket_url}/{self._fix_path(file_path)}", local_directory_path]
+        _ = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return new_local_file_path
 
     @Decorator.catch_process_error_and_raise
-    def upload_file(self, local_file_path: str, destination_directory_path: str) -> None:
+    def upload_file(self, local_file_path: str, destination_directory_path: str) -> str:
         if not os.path.isfile(local_file_path):
             raise ValueError(f"Local file path {local_file_path} does not exist")
 
-        cmd = [self._s3_cmd, ]
-        cmd_output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        new_file_remote_path  = (
+            f"{self._bucket_url}/{self._fix_path(destination_directory_path)}/{os.path.split(local_file_path)[-1]}")
+        cmd = [self._s3_cmd, "--progress", "put", local_file_path, new_file_remote_path]
+        _ = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        return new_file_remote_path
 
     @staticmethod
     def _get_s3cmd_path() -> str:
         cmd_output = subprocess.check_output(["which", "s3cmd"])
         return cmd_output.decode(ENCODING).strip()
+
+    @staticmethod
+    def _check_s3cmd_cfg_exists() -> bool:
+        home_dir = os.path.expanduser("~")
+        s3cfg_path = os.path.join(home_dir, ".s3cfg")
+        return os.path.isfile(s3cfg_path)
+
+    @staticmethod
+    def _fix_path(path: str) -> str:
+        return path.lstrip("/").rstrip("/")
 
 
 class S3BackupSync:
@@ -145,7 +167,7 @@ class S3BackupSync:
         return False
 
 
-def parse_argument():
+def parse_arguments():
     parser = argparse.ArgumentParser(prog="s3_backup_sync.py", description="S3 Backup Sync")
     parser.add_argument(
         "-l",
@@ -160,15 +182,19 @@ def parse_argument():
 
 
 def main():
-    args = parse_argument()
-    endpoint = os.environ["S3_ENDPOINT"]
-    template_access_bucket = f"%(bucket)s.{endpoint}"
-    bucket_url = os.environ["S3_BUCKET_URL"]
-    access_key = os.environ["S3_ACCESS_KEY"]
-    secret_key = os.environ["S3_SECRET_KEY"]
+    args = parse_arguments()
+    bucket_name = os.environ["S3_BUCKET_NAME"]
+    s3 = S3CmdWrapper(bucket_name)
 
-    s3 = S3CmdWrapper(bucket_url, access_key, secret_key)
-    s3_backup_sync = S3BackupSync(s3, args.directory_list_file)
+    file_list = s3.list_files("backup/e14")
+    print(file_list)
+
+    #downloaded_file = s3.get_file("/backup/e14/files.lst", ".")
+    #print(downloaded_file)
+
+    new_uploaded_file = s3.upload_file("./files_1.lst", "backup/e14")
+    print(new_uploaded_file)
+    #s3_backup_sync = S3BackupSync(s3, args.directory_list_path)
 
 
 if __name__ == "__main__":

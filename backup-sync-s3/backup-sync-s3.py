@@ -21,7 +21,7 @@ class S3CommandError(Exception):
 @dataclasses.dataclass(frozen=True)
 class S3FileInfo:
     path: str
-    size: int
+    size_gb: int
     uploaded: datetime
 
 
@@ -40,6 +40,7 @@ class BackupLocation:
 class S3CmdWrapper:
     """ Wrapper for s3cmd command line utility: https://s3tools.org/"""
     config_filename: ClassVar[str] = ".s3cfg"
+    s3cmd: ClassVar[str] = "s3cmd"
 
     def __init__(self, bucket_name: str) -> None:
         self._bucket_url = f"s3://{bucket_name}"
@@ -58,6 +59,7 @@ class S3CmdWrapper:
                     return func(self, *args, **kwargs)
                 except subprocess.CalledProcessError as e:
                     print(f"Command failed! {e}")
+                    raise S3CommandError from e
 
             return inner
 
@@ -75,7 +77,7 @@ class S3CmdWrapper:
             file_list.append(
                 S3FileInfo(
                     path=line_split[-1],
-                    size=int(line_split[2]),
+                    size_gb=int(line_split[2]) / 1000**3,
                     uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M")))
 
         return file_list
@@ -189,7 +191,7 @@ def main():
     file_list = s3.list_files("backup/e14")
     print(file_list)
 
-    #downloaded_file = s3.get_file("/backup/e14/files.lst", ".")
+    #downloaded_file = s3.get_file("/backup/e14/files_1.lst", ".")
     #print(downloaded_file)
 
     new_uploaded_file = s3.upload_file("./files_1.lst", "backup/e14")

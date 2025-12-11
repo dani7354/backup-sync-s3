@@ -129,6 +129,8 @@ class S3BackupSync:
 
     def __init__(self, s3: S3CmdWrapper, backup_directory_list_path: str) -> None:
         self._s3 = s3
+        if not os.path.isfile(backup_directory_list_path):
+            raise FileNotFoundError(f"Backup directory list file {backup_directory_list_path} not found!")
         self._backup_directory_list_path = backup_directory_list_path
 
     def read_file_list(self, remote_directory_path: str, local_directory_path: str) -> list[Backup]:
@@ -157,9 +159,18 @@ class S3BackupSync:
             print(f"An instance of {self.__class__.__name__} is already running! Closing...")
             return
 
+        fail_count = 0
         with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
             for backup_location in self.get_backup_locations():
-                backups = self.read_file_list(backup_location.remote_path, tmp_dir)
+                try:
+                    self._sync_backups(tmp_dir, backup_location)
+                except S3CommandError as e:
+                    fail_count += 1
+                    print(f"Error syncing backups for location {backup_location.remote_path}: {e}")
+
+        status_message = f"Backup sync completed with {fail_count} errors." \
+            if fail_count else "Backup sync completed successfully."
+        print(status_message)
 
 
     def _is_instance_running(self) -> bool:
@@ -167,6 +178,23 @@ class S3BackupSync:
             if item.startswith(self._tmp_directory_prefix):
                 return True
         return False
+
+    def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
+        remote_backups = self.read_file_list(backup_location.remote_path, tmp_dir)
+
+        remote_backup_files = set(backup.filename for backup in remote_backups)
+        print(f"{len(remote_backup_files)} remote backups found in {backup_location.remote_path}")
+
+        local_backups = set(os.listdir(backup_location.local_path))
+        print(f"{len(local_backups)} local backups found in {backup_location.remote_path}")
+
+        backups_to_upload = local_backups - remote_backup_files
+        print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
+
+        for backup_filename in backups_to_upload:
+            local_backup_file_path = os.path.join(backup_location.local_path, backup_filename)
+            print(f"Uploading backup file: {local_backup_file_path} to {backup_location.remote_path}")
+            self._s3.upload_file(local_backup_file_path, backup_location.remote_path)
 
 
 def parse_arguments():

@@ -155,13 +155,13 @@ class S3BackupSync:
             return
 
         fail_count = 0
-        with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
-            for backup_location in self._get_backup_locations():
-                try:
+        for backup_location in self._get_backup_locations():
+            try:
+                with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
                     self._sync_backups(tmp_dir, backup_location)
-                except S3CommandError as e:
-                    fail_count += 1
-                    print(f"Error syncing backups for location {backup_location.remote_path}: {e}")
+            except S3CommandError as e:
+                fail_count += 1
+                print(f"Error syncing backups for location {backup_location.remote_path}: {e}")
 
         status_message = f"Backup sync completed with {fail_count} errors." \
             if fail_count else "Backup sync completed successfully."
@@ -239,7 +239,7 @@ class S3BackupSync:
         print(f"{len(remote_backups)} remote backups found in {backup_location.remote_path}")
 
         local_backups = set(self._get_local_backups(backup_location.local_path))
-        print(f"{len(local_backups)} local backups found in {backup_location.remote_path}")
+        print(f"{len(local_backups)} local backups found in {backup_location.local_path}")
 
         return list(local_backups - remote_backups)
 

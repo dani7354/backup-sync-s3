@@ -21,7 +21,6 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 ENCODING = "utf-8"
 
 
-
 class S3CommandError(Exception):
     pass
 

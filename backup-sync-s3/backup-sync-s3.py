@@ -57,7 +57,6 @@ class BackupLocation:
 class S3CmdWrapper:
     """ Wrapper for s3cmd command line utility: https://s3tools.org/ """
     config_filename: ClassVar[str] = ".s3cfg"
-    s3cmd: ClassVar[str] = "s3cmd"
 
     def __init__(self, bucket_name: str) -> None:
         self._bucket_url = f"s3://{bucket_name}"
@@ -138,7 +137,7 @@ class S3CmdWrapper:
 
     @staticmethod
     def _fix_path(path: str) -> str:
-        return path.lstrip("/").rstrip("/")
+        return path.strip("/")
 
 
 class S3BackupSync:
@@ -149,8 +148,49 @@ class S3BackupSync:
         if not os.path.isfile(backup_directory_list_path):
             raise FileNotFoundError(f"Backup directory list file {backup_directory_list_path} not found!")
         self._backup_directory_list_path = backup_directory_list_path
+        self._tmp_directory_path = TMP_DIR_PATH
 
-    def read_file_list_backups(self, remote_directory_path: str, tmp_directory_path: str) -> list[Backup]:
+    def run_backup_sync(self) -> None:
+        if self._is_instance_running():
+            print(f"An instance of {self.__class__.__name__} is already running! Closing...")
+            return
+
+        fail_count = 0
+        with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
+            for backup_location in self._get_backup_locations():
+                try:
+                    self._sync_backups(tmp_dir, backup_location)
+                except S3CommandError as e:
+                    fail_count += 1
+                    print(f"Error syncing backups for location {backup_location.remote_path}: {e}")
+
+        status_message = f"Backup sync completed with {fail_count} errors." \
+            if fail_count else "Backup sync completed successfully."
+        print(status_message)
+
+    def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
+        if backups_to_upload := self._get_backups_to_upload(backup_location, tmp_dir):
+            print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
+        else:
+            print(f"No new backups to upload to {backup_location.remote_path}")
+            return
+
+        successful_uploads = []
+        failed_upload_count = 0
+        for backup, success in self._upload_backups(backup_location, backups_to_upload).items():
+            if success:
+                successful_uploads.append(backup)
+            else:
+                failed_upload_count += 1
+
+        if successful_uploads:
+            print("Adding new backups to file list...")
+            self._add_to_file_list(successful_uploads, tmp_dir, backup_location.remote_path)
+
+        if failed_upload_count:
+            print(f"{failed_upload_count} backups failed to upload to {backup_location.remote_path}")
+
+    def _read_file_list_backups(self, remote_directory_path: str, tmp_directory_path: str) -> list[Backup]:
         backups = []
         self._s3.get_file(os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path)
         with open(os.path.join(tmp_directory_path, REMOTE_FILE_LIST), "r") as f:
@@ -163,7 +203,7 @@ class S3BackupSync:
 
         return backups
 
-    def get_local_backups(self, local_directory_path: str) -> list[Backup]:
+    def _get_local_backups(self, local_directory_path: str) -> list[Backup]:
         backups = []
         for file in os.listdir(local_directory_path):
             if file.startswith(".") or not os.path.isfile(file):
@@ -176,7 +216,7 @@ class S3BackupSync:
 
         return backups
 
-    def add_to_file_list(self, backups: Sequence[Backup], local_directory_path: str, remote_directory_path) -> None:
+    def _add_to_file_list(self, backups: Sequence[Backup], local_directory_path: str, remote_directory_path) -> None:
         file_list_local_path = os.path.join(local_directory_path, REMOTE_FILE_LIST)
         with open(file_list_local_path, "a") as f:
             for backup in backups:
@@ -185,7 +225,7 @@ class S3BackupSync:
 
         self._s3.upload_file(file_list_local_path, remote_directory_path)
 
-    def get_backup_locations(self) -> list[BackupLocation]:
+    def _get_backup_locations(self) -> list[BackupLocation]:
         backup_locations = []
         with open(self._backup_directory_list_path, mode="r") as f:
             for line in f.readlines():
@@ -195,48 +235,18 @@ class S3BackupSync:
 
         return backup_locations
 
-    def run_backup_sync(self) -> None:
-        if self._is_instance_running():
-            print(f"An instance of {self.__class__.__name__} is already running! Closing...")
-            return
-
-        fail_count = 0
-        with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
-            for backup_location in self.get_backup_locations():
-                try:
-                    self._sync_backups(tmp_dir, backup_location)
-                except S3CommandError as e:
-                    fail_count += 1
-                    print(f"Error syncing backups for location {backup_location.remote_path}: {e}")
-
-        status_message = f"Backup sync completed with {fail_count} errors." \
-            if fail_count else "Backup sync completed successfully."
-        print(status_message)
-
-
-    def _is_instance_running(self) -> bool:
-        for item in os.listdir(TMP_DIR_PATH):
-            if item.startswith(self._tmp_directory_prefix):
-                return True
-        return False
-
-    def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
-        remote_backups = set(self.read_file_list_backups(backup_location.remote_path, tmp_dir))
+    def _get_backups_to_upload(self, backup_location: BackupLocation, tmp_directory: str) -> list[Backup]:
+        remote_backups = set(self._read_file_list_backups(backup_location.remote_path, tmp_directory))
         print(f"{len(remote_backups)} remote backups found in {backup_location.remote_path}")
 
-        local_backups = set(self.get_local_backups(backup_location.local_path))
+        local_backups = set(self._get_local_backups(backup_location.local_path))
         print(f"{len(local_backups)} local backups found in {backup_location.remote_path}")
 
-        print("local: ", local_backups)
-        print("remote:", remote_backups)
-        if backups_to_upload := local_backups - remote_backups:
-            print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
-        else:
-            print(f"No new backups to upload to {backup_location.remote_path}")
-            return
+        return list(local_backups - remote_backups)
 
+    def _upload_backups(self, backup_location: BackupLocation, backups: Sequence[Backup]) -> dict[Backup, bool]:
         backup_upload_status = {}
-        for backup in backups_to_upload:
+        for backup in backups:
             local_backup_file_path = os.path.join(backup_location.local_path, backup.filename)
             backup_digest = self._get_sha256_hash(local_backup_file_path)
             new_backup = Backup(local_backup_file_path, backup_digest, datetime.now())
@@ -249,21 +259,13 @@ class S3BackupSync:
                 backup_upload_status[new_backup] = False
                 print(f"Error uploading backup file {backup.filename}: {e}")
 
-        successful_uploads = []
-        failed_upload_count = 0
-        for backup, success in backup_upload_status.items():
-            if success:
-                successful_uploads.append(backup)
-            else:
-                failed_upload_count += 1
+        return backup_upload_status
 
-        if successful_uploads:
-            print("Adding new backups to file list...")
-            successful_uploads = [backup for backup, status in backup_upload_status.items() if status]
-            self.add_to_file_list(successful_uploads, tmp_dir, backup_location.remote_path)
-
-        if failed_upload_count:
-            print(f"{failed_upload_count} backups failed to upload to {backup_location.remote_path}")
+    def _is_instance_running(self) -> bool:
+        for item in os.listdir(self._tmp_directory_path):
+            if item.startswith(self._tmp_directory_prefix):
+                return True
+        return False
 
     @staticmethod
     def _get_sha256_hash(input_file: str) -> str:
@@ -310,23 +312,6 @@ def main() -> None:
     s3 = S3CmdWrapper(s3_bucket_name)
     s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
     s3_backup_sync.run_backup_sync()
-
-
-
-def run_test_commands():  # TODO: remove!
-    args = _parse_arguments()
-    backup_directory_list_path = _validate_and_get_backup_list(args)
-    s3_bucket_name = _validate_and_get_s3_bucket_name()
-    s3 = S3CmdWrapper(s3_bucket_name)
-    file_list = s3.list_files("backup/e14")
-    print(file_list)
-
-    # downloaded_file = s3.get_file("/backup/e14/files_1.lst", ".")
-    # print(downloaded_file)
-
-    new_uploaded_file = s3.upload_file("./files_1.lst", "backup/e14")
-    print(new_uploaded_file)
-    # s3_backup_sync = S3BackupSync(s3, args.directory_list_path)
 
 
 if __name__ == "__main__":

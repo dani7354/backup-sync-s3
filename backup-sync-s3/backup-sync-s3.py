@@ -4,10 +4,9 @@ import functools
 import os
 import subprocess
 import tempfile
-from argparse import ArgumentParser
-from collections.abc import Sequence
 from datetime import datetime
-from typing import ClassVar, Iterable
+from typing import ClassVar, Sequence
+from hashlib import sha256
 
 REMOTE_FILE_LIST = "files.lst"
 TMP_DIR_PATH = "/tmp"
@@ -28,6 +27,7 @@ class S3FileInfo:
 @dataclasses.dataclass(frozen=True)
 class Backup:
     filename: str
+    hash: str
     created: datetime
 
 
@@ -38,7 +38,7 @@ class BackupLocation:
 
 
 class S3CmdWrapper:
-    """ Wrapper for s3cmd command line utility: https://s3tools.org/"""
+    """ Wrapper for s3cmd command line utility: https://s3tools.org/ """
     config_filename: ClassVar[str] = ".s3cfg"
     s3cmd: ClassVar[str] = "s3cmd"
 
@@ -135,14 +135,24 @@ class S3BackupSync:
 
     def read_file_list(self, remote_directory_path: str, local_directory_path: str) -> list[Backup]:
         backups = []
-        self._s3.get_file(REMOTE_FILE_LIST, local_directory_path)
+        self._s3.get_file(REMOTE_FILE_LIST, remote_directory_path)
         with open(os.path.join(local_directory_path, REMOTE_FILE_LIST), "r") as f:
             for line in f.readlines():
                 values = line.split(";")
                 created = datetime.strptime(values[0], "%Y-%m-%dT%H:%M:%S.%f")
                 filename = values[1]
-                backups.append(Backup(filename, created))
+                digest = values[2]
+                backups.append(Backup(filename, digest, created))
+
         return backups
+
+    def add_to_file_list(self, backups: Sequence[Backup], local_directory_path: str, remote_directory_path) -> None:
+        file_list_local_path = os.path.join(local_directory_path, REMOTE_FILE_LIST)
+        with open(file_list_local_path, "a") as f:
+            for backup in backups:
+                f.write(f"{backup.filename};{backup.created.isoformat()};{backup.hash}\n")
+
+        self._s3.upload_file(file_list_local_path, remote_directory_path)
 
     def get_backup_locations(self) -> list[BackupLocation]:
         backup_locations = []
@@ -152,7 +162,6 @@ class S3BackupSync:
                 backup_locations.append(BackupLocation(local_path, remote_path))
 
         return backup_locations
-
 
     def run_backup_sync(self) -> None:
         if self._is_instance_running():
@@ -189,12 +198,49 @@ class S3BackupSync:
         print(f"{len(local_backups)} local backups found in {backup_location.remote_path}")
 
         backups_to_upload = local_backups - remote_backup_files
-        print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
+        if backups_to_upload:
+            print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
+        else:
+            print(f"No new backups to upload to {backup_location.remote_path}")
+            return
 
+        backup_upload_status = {}
         for backup_filename in backups_to_upload:
             local_backup_file_path = os.path.join(backup_location.local_path, backup_filename)
-            print(f"Uploading backup file: {local_backup_file_path} to {backup_location.remote_path}")
-            self._s3.upload_file(local_backup_file_path, backup_location.remote_path)
+            backup_digest = self._get_sha256_hash(local_backup_file_path)
+            new_backup = Backup(local_backup_file_path, backup_digest, datetime.now())
+
+            try:
+                print(f"Uploading backup file: {local_backup_file_path} to {backup_location.remote_path}")
+                self._s3.upload_file(local_backup_file_path, backup_location.remote_path)
+                backup_upload_status[new_backup] = True
+            except S3CommandError as e:
+                backup_upload_status[new_backup] = False
+                print(f"Error uploading backup file {backup_filename}: {e}")
+
+        successful_uploads = []
+        failed_upload_count = 0
+        for backup, success in backup_upload_status.items():
+            if success:
+                successful_uploads.append(backup)
+            else:
+                failed_upload_count += 1
+
+        if successful_uploads:
+            print("Adding new backups to file list...")
+            successful_uploads = [backup for backup, status in backup_upload_status.items() if status]
+            self.add_to_file_list(successful_uploads, tmp_dir, backup_location.remote_path)
+
+        if failed_upload_count:
+            print(f"{failed_upload_count} backups failed to upload to {backup_location.remote_path}")
+
+    @staticmethod
+    def _get_sha256_hash(input_file: str) -> str:
+        sha256_hash = sha256()
+        with open(input_file, "rb") as f:
+            while byte_block := f.read(4096):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
 
 
 def parse_arguments():

@@ -230,7 +230,7 @@ class S3BackupSync:
             for line in f.readlines():
                 local_path, remote_path = line.split(CSV_CELL_DELIMITER)
                 print(f"Found backup location - local: {local_path}, remote: {remote_path}")
-                backup_locations.append(BackupLocation(local_path, remote_path))
+                backup_locations.append(BackupLocation(local_path.strip(), remote_path.strip()))
 
         return backup_locations
 

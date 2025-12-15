@@ -4,13 +4,22 @@ import functools
 import os
 import subprocess
 import tempfile
+import pathlib
+from dataclasses import field
 from datetime import datetime
 from typing import ClassVar, Sequence
 from hashlib import sha256
 
+
+S3_BUCKET_NAME_ENV_VAR = "S3_BUCKET_NAME"
+
 REMOTE_FILE_LIST = "files.lst"
+CSV_CELL_DELIMITER = ";"
+
 TMP_DIR_PATH = "/tmp"
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 ENCODING = "utf-8"
+
 
 
 class S3CommandError(Exception):
@@ -27,8 +36,16 @@ class S3FileInfo:
 @dataclasses.dataclass(frozen=True)
 class Backup:
     filename: str
-    hash: str
+    hash: str = field(compare=True)
     created: datetime
+
+    def __hash__(self) -> int:
+        return hash(self.hash)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Backup):
+            return False
+        return self.hash == other.hash
 
 
 @dataclasses.dataclass(frozen=True)
@@ -127,22 +144,35 @@ class S3CmdWrapper:
 class S3BackupSync:
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
 
-    def __init__(self, s3: S3CmdWrapper, backup_directory_list_path: str) -> None:
+    def __init__(self, s3: S3CmdWrapper, backup_directory_list_path: pathlib.Path) -> None:
         self._s3 = s3
         if not os.path.isfile(backup_directory_list_path):
             raise FileNotFoundError(f"Backup directory list file {backup_directory_list_path} not found!")
         self._backup_directory_list_path = backup_directory_list_path
 
-    def read_file_list(self, remote_directory_path: str, local_directory_path: str) -> list[Backup]:
+    def read_file_list_backups(self, remote_directory_path: str, tmp_directory_path: str) -> list[Backup]:
         backups = []
-        self._s3.get_file(REMOTE_FILE_LIST, remote_directory_path)
-        with open(os.path.join(local_directory_path, REMOTE_FILE_LIST), "r") as f:
+        self._s3.get_file(os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path)
+        with open(os.path.join(tmp_directory_path, REMOTE_FILE_LIST), "r") as f:
             for line in f.readlines():
-                values = line.split(";")
-                created = datetime.strptime(values[0], "%Y-%m-%dT%H:%M:%S.%f")
-                filename = values[1]
+                values = line.rstrip().split(CSV_CELL_DELIMITER)
+                filename = values[0]
+                created = datetime.strptime(values[1], DATE_FORMAT)
                 digest = values[2]
                 backups.append(Backup(filename, digest, created))
+
+        return backups
+
+    def get_local_backups(self, local_directory_path: str) -> list[Backup]:
+        backups = []
+        for file in os.listdir(local_directory_path):
+            if file.startswith(".") or not os.path.isfile(file):
+                continue
+
+            file_path = os.path.join(local_directory_path, file)
+            file_hash = self._get_sha256_hash(file_path)
+            created_time = datetime.fromtimestamp(os.path.getctime(file_path))
+            backups.append(Backup(file, file_hash, created_time))
 
         return backups
 
@@ -150,15 +180,17 @@ class S3BackupSync:
         file_list_local_path = os.path.join(local_directory_path, REMOTE_FILE_LIST)
         with open(file_list_local_path, "a") as f:
             for backup in backups:
-                f.write(f"{backup.filename};{backup.created.isoformat()};{backup.hash}\n")
+                print("adding to file list:", backup)
+                f.write(f"{backup.filename};{backup.created.strftime(DATE_FORMAT)};{backup.hash}\n")
 
         self._s3.upload_file(file_list_local_path, remote_directory_path)
 
     def get_backup_locations(self) -> list[BackupLocation]:
         backup_locations = []
         with open(self._backup_directory_list_path, mode="r") as f:
-            for l in f.readlines():
-                local_path, remote_path = l.split(";")
+            for line in f.readlines():
+                local_path, remote_path = line.split(CSV_CELL_DELIMITER)
+                print(f"Found backup location - local: {local_path}, remote: {remote_path}")
                 backup_locations.append(BackupLocation(local_path, remote_path))
 
         return backup_locations
@@ -189,24 +221,23 @@ class S3BackupSync:
         return False
 
     def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
-        remote_backups = self.read_file_list(backup_location.remote_path, tmp_dir)
+        remote_backups = set(self.read_file_list_backups(backup_location.remote_path, tmp_dir))
+        print(f"{len(remote_backups)} remote backups found in {backup_location.remote_path}")
 
-        remote_backup_files = set(backup.filename for backup in remote_backups)
-        print(f"{len(remote_backup_files)} remote backups found in {backup_location.remote_path}")
-
-        local_backups = set(os.listdir(backup_location.local_path))
+        local_backups = set(self.get_local_backups(backup_location.local_path))
         print(f"{len(local_backups)} local backups found in {backup_location.remote_path}")
 
-        backups_to_upload = local_backups - remote_backup_files
-        if backups_to_upload:
+        print("local: ", local_backups)
+        print("remote:", remote_backups)
+        if backups_to_upload := local_backups - remote_backups:
             print(f"{len(backups_to_upload)} backups will be uploaded to {backup_location.remote_path}")
         else:
             print(f"No new backups to upload to {backup_location.remote_path}")
             return
 
         backup_upload_status = {}
-        for backup_filename in backups_to_upload:
-            local_backup_file_path = os.path.join(backup_location.local_path, backup_filename)
+        for backup in backups_to_upload:
+            local_backup_file_path = os.path.join(backup_location.local_path, backup.filename)
             backup_digest = self._get_sha256_hash(local_backup_file_path)
             new_backup = Backup(local_backup_file_path, backup_digest, datetime.now())
 
@@ -216,7 +247,7 @@ class S3BackupSync:
                 backup_upload_status[new_backup] = True
             except S3CommandError as e:
                 backup_upload_status[new_backup] = False
-                print(f"Error uploading backup file {backup_filename}: {e}")
+                print(f"Error uploading backup file {backup.filename}: {e}")
 
         successful_uploads = []
         failed_upload_count = 0
@@ -243,34 +274,59 @@ class S3BackupSync:
         return sha256_hash.hexdigest()
 
 
-def parse_arguments():
+def _parse_arguments():
     parser = argparse.ArgumentParser(prog="s3_backup_sync.py", description="S3 Backup Sync")
     parser.add_argument(
         "-l",
-        "--directory-list-path",
-        help="Text file containing location of encrypted backups",
-        dest="directory_list_path",
-        type=str,
-        nargs=1,
-        required=True
-    )
-    return parser.parse_args
+        "--backup-list-path",
+        help="TXT file containing location of encrypted backups",
+        dest="backup_list_path",
+        type=pathlib.Path,
+        required=True)
+    return parser.parse_args()
 
 
-def main():
-    args = parse_arguments()
-    bucket_name = os.environ["S3_BUCKET_NAME"]
-    s3 = S3CmdWrapper(bucket_name)
+def _validate_and_get_backup_list(args: argparse.Namespace) -> pathlib.Path:
+    if not (backups_path := args.backup_list_path) or not backups_path.is_file():
+        raise FileNotFoundError(f"Backup directory list file {backups_path} not found!")
 
+    return backups_path
+
+
+def _validate_and_get_s3_bucket_name() -> str:
+    if not (s3_bucket_name := os.environ.get(S3_BUCKET_NAME_ENV_VAR)):
+        raise EnvironmentError(f"{S3_BUCKET_NAME_ENV_VAR} environment variable not set!")
+    if len(s3_bucket_name) < 3:
+        raise ValueError(f"S3 bucket name {s3_bucket_name} is invalid")
+
+    return s3_bucket_name
+
+
+def main() -> None:
+    args = _parse_arguments()
+    backup_directory_list_path = _validate_and_get_backup_list(args)
+    s3_bucket_name = _validate_and_get_s3_bucket_name()
+
+    s3 = S3CmdWrapper(s3_bucket_name)
+    s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
+    s3_backup_sync.run_backup_sync()
+
+
+
+def run_test_commands():  # TODO: remove!
+    args = _parse_arguments()
+    backup_directory_list_path = _validate_and_get_backup_list(args)
+    s3_bucket_name = _validate_and_get_s3_bucket_name()
+    s3 = S3CmdWrapper(s3_bucket_name)
     file_list = s3.list_files("backup/e14")
     print(file_list)
 
-    #downloaded_file = s3.get_file("/backup/e14/files_1.lst", ".")
-    #print(downloaded_file)
+    # downloaded_file = s3.get_file("/backup/e14/files_1.lst", ".")
+    # print(downloaded_file)
 
     new_uploaded_file = s3.upload_file("./files_1.lst", "backup/e14")
     print(new_uploaded_file)
-    #s3_backup_sync = S3BackupSync(s3, args.directory_list_path)
+    # s3_backup_sync = S3BackupSync(s3, args.directory_list_path)
 
 
 if __name__ == "__main__":

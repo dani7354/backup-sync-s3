@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import ClassVar, Sequence
 from hashlib import file_digest, sha256
 
-from pygments.lexers import find_lexer_class_for_filename
 
 S3_BUCKET_NAME_ENV_VAR = "S3_BUCKET_NAME"
 

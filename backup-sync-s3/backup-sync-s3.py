@@ -89,11 +89,13 @@ class S3CmdWrapper:
             if len(line_split) < 4:
                 continue
 
-            file_list.append(
-                S3FileInfo(
+            file = S3FileInfo(
                     path=line_split[-1],
                     size_gb=int(line_split[2]) / 1000**3,
-                    uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M")))
+                    uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M"))
+
+            print(f"Found file {file}")
+            file_list.append(file)
 
         return file_list
 
@@ -205,10 +207,10 @@ class S3BackupSync:
     def _get_local_backups(self, local_directory_path: str) -> list[Backup]:
         backups = []
         for file in os.listdir(local_directory_path):
-            if file.startswith(".") or not os.path.isfile(file):
+            file_path = os.path.join(local_directory_path, file)
+            if file.startswith(".") or not os.path.isfile(file_path):
                 continue
 
-            file_path = os.path.join(local_directory_path, file)
             file_hash = self._get_sha256_hash(file_path)
             created_time = datetime.fromtimestamp(os.path.getctime(file_path))
             backups.append(Backup(file, file_hash, created_time))

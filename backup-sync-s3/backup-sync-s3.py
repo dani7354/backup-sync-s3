@@ -89,11 +89,13 @@ class S3CmdWrapper:
             if len(line_split) < 4:
                 continue
 
-            file_list.append(
-                S3FileInfo(
+            file = S3FileInfo(
                     path=line_split[-1],
                     size_gb=int(line_split[2]) / 1000**3,
-                    uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M")))
+                    uploaded=datetime.strptime(f"{line_split[0]} {line_split[1]}", "%Y-%m-%d %H:%M"))
+
+            print(f"Found file {file}")
+            file_list.append(file)
 
         return file_list
 

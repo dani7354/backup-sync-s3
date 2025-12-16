@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import ClassVar, Sequence
 from hashlib import file_digest, sha256
 
+from pygments.lexers import find_lexer_class_for_filename
 
 S3_BUCKET_NAME_ENV_VAR = "S3_BUCKET_NAME"
 
@@ -205,10 +206,10 @@ class S3BackupSync:
     def _get_local_backups(self, local_directory_path: str) -> list[Backup]:
         backups = []
         for file in os.listdir(local_directory_path):
-            if file.startswith(".") or not os.path.isfile(file):
+            file_path = os.path.join(local_directory_path, file)
+            if file.startswith(".") or not os.path.isfile(file_path):
                 continue
 
-            file_path = os.path.join(local_directory_path, file)
             file_hash = self._get_sha256_hash(file_path)
             created_time = datetime.fromtimestamp(os.path.getctime(file_path))
             backups.append(Backup(file, file_hash, created_time))

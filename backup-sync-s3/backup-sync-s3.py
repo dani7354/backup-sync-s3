@@ -8,7 +8,7 @@ import pathlib
 from dataclasses import field
 from datetime import datetime
 from typing import ClassVar, Sequence
-from hashlib import file_digest, sha256
+from hashlib import file_digest, md5
 
 
 S3_BUCKET_NAME_ENV_VAR = "S3_BUCKET_NAME"
@@ -275,7 +275,7 @@ class S3BackupSync:
     def _get_sha256_hash(input_file: str) -> str:
         print(f"Calculating SHA256 hash for file: {input_file}")
         with open(input_file, "rb") as f:
-            checksum = file_digest(f, sha256)
+            checksum = file_digest(f, md5)
         return checksum.hexdigest()
 
 

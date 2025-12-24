@@ -16,6 +16,8 @@ S3_BUCKET_NAME_ENV_VAR = "S3_BUCKET_NAME"
 REMOTE_FILE_LIST = "files.lst"
 CSV_CELL_DELIMITER = ";"
 
+INCOMPLETE_BACKUP_PREFIX = "INCOMPLETE_"
+
 TMP_DIR_PATH = "/tmp"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 ENCODING = "utf-8"
@@ -143,6 +145,7 @@ class S3CmdWrapper:
 
 class S3BackupSync:
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
+    _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (".", INCOMPLETE_BACKUP_PREFIX)
 
     def __init__(self, s3: S3CmdWrapper, backup_directory_list_path: pathlib.Path) -> None:
         self._s3 = s3
@@ -208,7 +211,7 @@ class S3BackupSync:
         backups = []
         for file in os.listdir(local_directory_path):
             file_path = os.path.join(local_directory_path, file)
-            if file.startswith(".") or not os.path.isfile(file_path):
+            if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
                 continue
 
             file_hash = self._get_sha256_hash(file_path)

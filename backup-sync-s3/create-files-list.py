@@ -11,7 +11,7 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 CELL_DELIMITER = ";"
 
 
-def main()-> None:
+def main()  -> None:
     if len(sys.argv) < 2:
         print("Usage: python create-files-list.py <directory>")
         return

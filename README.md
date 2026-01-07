@@ -18,6 +18,6 @@ local_directory;remote_directory
 
 `files.lst` - placed in each remote directory
 ```
-file;uploaded;sha256
-backup.tar.gz;2025-11-01;3ac1fcef9cd7368c9bbf491b27766d670ab3c6507d47396898f046b4ef32009a
+file;uploaded;md5
+backup.tar.gz;2025-11-01;d41d8cd98f00b204e9800998ecf8427e
 ```

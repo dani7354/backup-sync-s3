@@ -31,7 +31,7 @@ def main() -> None:
     total_size = FILE_SIZE_MB * 1024 * 1024
 
     for i in range(1, num_files + 1):
-        file_path = location_dir / f"testfile_{i:04d}.bin"
+        file_path = location_dir / f"testfile_{i:04d}.tar.enc"
         print(f"Generating {file_path} ({FILE_SIZE_MB} MB)...")
         bytes_written = 0
         with open(file_path, "wb") as f:

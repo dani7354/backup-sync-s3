@@ -8,6 +8,7 @@ class EnvVar(StrEnum):
     S3_REGION = "S3_REGION"
     S3_ACCESS_KEY = "S3_ACCESS_KEY"
     S3_SECRET_KEY = "S3_SECRET_KEY"
+    BACKUP_LIST_PATH = "BACKUP_LIST_PATH"
 
 
 def require_env_var(name: str) -> str:

@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from hashlib import file_digest, md5
+from hashlib import file_digest, sha256
 
 
 FILE_LIST = "files.lst"
@@ -31,7 +31,7 @@ def main()  -> None:
         for file_path in files_dir.rglob(f'*{FILE_EXTENSION}'):
             print(f"Adding file {file_path}...")
             with open(file_path, "rb") as f:
-                digest = file_digest(f, md5).hexdigest()
+                digest = file_digest(f, sha256).hexdigest()
             file_created = datetime.fromtimestamp(os.path.getctime(file_path))
             f_list.write(
                 f"{file_path}{CELL_DELIMITER}{file_created.strftime(DATE_FORMAT)}{CELL_DELIMITER}{digest}\n")

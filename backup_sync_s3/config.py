@@ -22,5 +22,5 @@ S3_ENDPOINT_URL = require_env_var(EnvVar.S3_ENDPOINT_URL)
 S3_REGION = require_env_var(EnvVar.S3_REGION)
 S3_ACCESS_KEY = require_env_var(EnvVar.S3_ACCESS_KEY)
 S3_SECRET_KEY = require_env_var(EnvVar.S3_SECRET_KEY)
-
+BACKUP_LIST_PATH = require_env_var(EnvVar.BACKUP_LIST_PATH)
 

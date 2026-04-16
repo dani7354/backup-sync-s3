@@ -12,10 +12,6 @@ from pathlib import Path
 from hashlib import md5
 
 
-class S3CommandError(Exception):
-    pass
-
-
 @dataclasses.dataclass(frozen=True)
 class Backup:
     filename: str

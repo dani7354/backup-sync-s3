@@ -1,5 +1,7 @@
 import dataclasses
 import os
+import time
+
 import tempfile
 from datetime import datetime
 from logging import getLogger
@@ -34,6 +36,7 @@ class BackupLocation:
 
 
 class S3BackupSync:
+    _sleep_time_s: ClassVar[int] = 86400
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
     _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (".", INCOMPLETE_BACKUP_PREFIX)
 
@@ -61,6 +64,9 @@ class S3BackupSync:
             self._logger.warning("Backup sync completed with %d error(s).", fail_count)
         else:
             self._logger.info("Backup sync completed successfully.")
+
+        self._logger.info("Going to sleep for %d seconds...", self._sleep_time_s)
+        time.sleep(self._sleep_time_s)
 
     def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
         if backups_to_upload := self._get_backups_to_upload(backup_location, tmp_dir):

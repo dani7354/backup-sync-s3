@@ -8,8 +8,8 @@ from logging import getLogger
 from typing import ClassVar, Sequence
 
 from backup_sync_s3.s3 import S3Wrapper, S3CommandError
-from backup_sync_s3.config import INCOMPLETE_BACKUP_PREFIX, TMP_DIR_PATH, REMOTE_FILE_LIST, DATE_FORMAT, \
-    CSV_CELL_DELIMITER, HASH_CHUNK_SIZE
+from backup_sync_s3.config import (
+    INCOMPLETE_BACKUP_PREFIX, TMP_DIR_PATH, REMOTE_FILE_LIST, DATE_FORMAT, CSV_CELL_DELIMITER, HASH_CHUNK_SIZE)
 from pathlib import Path
 from hashlib import md5
 

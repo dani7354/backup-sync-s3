@@ -1,0 +1,7 @@
+services:
+  sync:
+    image: dsp8ef9/s3sync:latest
+    build: .
+    env_file: .env
+    volumes:
+      - /data:./test_volume

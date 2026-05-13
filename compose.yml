@@ -4,4 +4,5 @@ services:
     build: .
     env_file: .env
     volumes:
-      - /data:./test_volume
+      - ./test_volume:/data:rw
+      - ./backups.lst:/app/backups.lst:ro

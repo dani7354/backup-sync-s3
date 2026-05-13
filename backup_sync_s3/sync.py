@@ -9,9 +9,9 @@ from typing import ClassVar, Sequence
 
 from backup_sync_s3.s3 import S3Wrapper, S3CommandError
 from backup_sync_s3.config import (
-    INCOMPLETE_BACKUP_PREFIX, TMP_DIR_PATH, REMOTE_FILE_LIST, DATE_FORMAT, CSV_CELL_DELIMITER, HASH_CHUNK_SIZE)
+    INCOMPLETE_BACKUP_PREFIX, TMP_DIR_PATH, REMOTE_FILE_LIST, DATE_FORMAT, CSV_CELL_DELIMITER)
 from pathlib import Path
-from hashlib import md5
+from hashlib import sha256, file_digest
 
 
 @dataclasses.dataclass(frozen=True)
@@ -38,7 +38,7 @@ class BackupLocation:
 class S3BackupSync:
     _sleep_time_s: ClassVar[int] = 86400
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
-    _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (".", INCOMPLETE_BACKUP_PREFIX)
+    _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (".", INCOMPLETE_BACKUP_PREFIX, REMOTE_FILE_LIST)
 
     def __init__(self, s3: S3Wrapper, backup_directory_list_path: Path) -> None:
         self._s3 = s3
@@ -59,6 +59,7 @@ class S3BackupSync:
             except S3CommandError as e:
                 fail_count += 1
                 self._logger.error("Error syncing backups for location %s: %s", backup_location.remote_path, e)
+                self._logger.exception(e)
 
         if fail_count:
             self._logger.warning("Backup sync completed with %d error(s).", fail_count)
@@ -169,6 +170,7 @@ class S3BackupSync:
             except S3CommandError as e:
                 backup_upload_status[new_backup] = False
                 self._logger.error("Error uploading backup file %s: %s", backup.filename, e)
+                self._logger.exception(e)
 
         return backup_upload_status
 
@@ -180,13 +182,6 @@ class S3BackupSync:
 
     @classmethod
     def _get_file_hash(cls, input_file: str) -> str:
-        """Compute the MD5 digest of a file using chunked reads.
-
-        Files are processed in HASH_CHUNK_SIZE blocks so that even multi-GB
-        archives never need to be fully loaded into memory.
-        """
-        hasher = md5()
         with open(input_file, "rb") as f:
-            while chunk := f.read(HASH_CHUNK_SIZE):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+            digest = file_digest(f, sha256).hexdigest()
+        return digest

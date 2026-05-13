@@ -53,8 +53,8 @@ def main() -> None:
         s3 = S3Wrapper(s3_config)
         s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
         s3_backup_sync.run_backup_sync()
-    except Exception:
-        _logger.exception("Unexpected error during backup sync")
+    except Exception as e:
+        _logger.exception("Unexpected error during backup sync", exc_info=e)
 
 if __name__ == "__main__":
     main()

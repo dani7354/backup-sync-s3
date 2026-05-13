@@ -178,7 +178,6 @@ class S3Wrapper:
         except ClientError:
             return 0
 
-
     @staticmethod
     def _fix_path(path: str) -> str:
         return path.strip("/")

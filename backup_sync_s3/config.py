@@ -14,9 +14,6 @@ MULTIPART_THRESHOLD = 100 * 1024 * 1024   # 100 MB
 MULTIPART_CHUNK_SIZE = 8 * 1024 * 1024    # 8 MB per part
 MULTIPART_MAX_CONCURRENCY = 4             # parallel threads per transfer
 
-# Block size used when streaming files through the MD5 hasher.
-HASH_CHUNK_SIZE = 4 * 1024 * 1024         # 4 MB
-
 S3_BUCKET_NAME = require_env_var(EnvVar.S3_BUCKET_NAME)
 S3_ENDPOINT_URL = require_env_var(EnvVar.S3_ENDPOINT_URL)
 S3_REGION = require_env_var(EnvVar.S3_REGION)

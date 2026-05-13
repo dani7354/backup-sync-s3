@@ -160,7 +160,7 @@ class S3Wrapper:
         file_size = os.path.getsize(local_file_path)
         callback = ProgressCallback(filename, file_size)
 
-        self._logger.info("Uploading %s → s3://%s/%s", local_file_path, self._bucket_name, key)
+        self._logger.info("Uploading %s -> s3://%s/%s", local_file_path, self._bucket_name, key)
         self._client.upload_file(
             local_file_path,
             self._bucket_name,

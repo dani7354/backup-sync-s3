@@ -1,9 +1,7 @@
-import argparse
 import logging
 import pathlib
 
 from backup_sync_s3.s3 import S3Wrapper, S3Config
-from backup_sync_s3.settings import require_env_var
 from backup_sync_s3.sync import S3BackupSync
 from backup_sync_s3.config import (
     S3_BUCKET_NAME, S3_ENDPOINT_URL, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY, BACKUP_LIST_PATH)
@@ -26,7 +24,7 @@ def _configure_logging() -> None:
 
 
 def _validate_and_get_backup_list() -> pathlib.Path:
-    backup_list_path = pathlib.Path(require_env_var(BACKUP_LIST_PATH))
+    backup_list_path = pathlib.Path(BACKUP_LIST_PATH)
     if not backup_list_path.is_file():
         raise FileNotFoundError(f"Backup directory list file {backup_list_path} not found!")
 
@@ -49,7 +47,7 @@ def _get_backup_list_path() -> pathlib.Path:
 def main() -> None:
     _configure_logging()
     try:
-        backup_directory_list_path = _validate_and_get_backup_list(args)
+        backup_directory_list_path = _validate_and_get_backup_list()
 
         s3_config = _get_s3_config()
         s3 = S3Wrapper(s3_config)

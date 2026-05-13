@@ -26,6 +26,7 @@ from boto3.s3.transfer import TransferConfig
 # Load .env when python-dotenv is available (optional)
 try:
     from dotenv import load_dotenv  # type: ignore[import]
+
     load_dotenv()
 except ImportError:
     load_dotenv = None  # type: ignore[assignment]
@@ -35,12 +36,15 @@ except ImportError:
 # Logging
 # ---------------------------------------------------------------------------
 
+
 def configure_logging(level: int = logging.DEBUG) -> None:
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
     logging.getLogger().setLevel(level)
     logging.getLogger().addHandler(handler)
 
@@ -51,6 +55,7 @@ _logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Progress callback
 # ---------------------------------------------------------------------------
+
 
 class ProgressCallback:
     """Thread-safe upload progress logger (identical pattern to s3.py)."""
@@ -81,6 +86,7 @@ class ProgressCallback:
 # S3 helpers
 # ---------------------------------------------------------------------------
 
+
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
@@ -106,13 +112,19 @@ def upload_file(local_path: str, s3_key: str) -> None:
     callback = ProgressCallback(os.path.basename(local_path), file_size)
 
     transfer_config = TransferConfig(
-        multipart_threshold=100 * 1024 * 1024,   # 100 MB
-        multipart_chunksize=8 * 1024 * 1024,     # 8 MB per part
+        multipart_threshold=100 * 1024 * 1024,  # 100 MB
+        multipart_chunksize=8 * 1024 * 1024,  # 8 MB per part
         use_threads=True,
         max_concurrency=4,
     )
 
-    _logger.info("Uploading '%s' -> s3://%s/%s (%s bytes)", local_path, bucket, s3_key, f"{file_size:,}")
+    _logger.info(
+        "Uploading '%s' -> s3://%s/%s (%s bytes)",
+        local_path,
+        bucket,
+        s3_key,
+        f"{file_size:,}",
+    )
     client.upload_file(
         local_path,
         bucket,
@@ -126,6 +138,7 @@ def upload_file(local_path: str, s3_key: str) -> None:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     configure_logging()

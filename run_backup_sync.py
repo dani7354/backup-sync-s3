@@ -4,20 +4,27 @@ import pathlib
 from backup_sync_s3.s3 import S3Wrapper, S3Config
 from backup_sync_s3.sync import S3BackupSync
 from backup_sync_s3.config import (
-    S3_BUCKET_NAME, S3_ENDPOINT_URL, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY, BACKUP_LIST_PATH)
+    S3_BUCKET_NAME,
+    S3_ENDPOINT_URL,
+    S3_REGION,
+    S3_ACCESS_KEY,
+    S3_SECRET_KEY,
+    BACKUP_LIST_PATH,
+)
 
 _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 
 
-
 def _configure_logging() -> None:
     """Configure the root logger with a single stream (console) handler."""
     handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    ))
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     root.addHandler(handler)
@@ -26,7 +33,9 @@ def _configure_logging() -> None:
 def _validate_and_get_backup_list() -> pathlib.Path:
     backup_list_path = pathlib.Path(BACKUP_LIST_PATH)
     if not backup_list_path.is_file():
-        raise FileNotFoundError(f"Backup directory list file {backup_list_path} not found!")
+        raise FileNotFoundError(
+            f"Backup directory list file {backup_list_path} not found!"
+        )
 
     return backup_list_path
 
@@ -37,7 +46,8 @@ def _get_s3_config() -> S3Config:
         endpoint_url=S3_ENDPOINT_URL,
         region=S3_REGION,
         access_key=S3_ACCESS_KEY,
-        secret_key=S3_SECRET_KEY)
+        secret_key=S3_SECRET_KEY,
+    )
 
 
 def _get_backup_list_path() -> pathlib.Path:
@@ -56,6 +66,6 @@ def main() -> None:
     except Exception as e:
         _logger.exception("Unexpected error during backup sync", exc_info=e)
 
+
 if __name__ == "__main__":
     main()
-

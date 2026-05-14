@@ -6,6 +6,8 @@ import tempfile
 from datetime import datetime
 from logging import getLogger
 from typing import ClassVar, Sequence
+from pathlib import Path
+from hashlib import sha256, file_digest
 
 from backup_sync_s3.s3 import S3Wrapper, S3CommandError
 from backup_sync_s3.config import (
@@ -15,8 +17,6 @@ from backup_sync_s3.config import (
     DATE_FORMAT,
     CSV_CELL_DELIMITER,
 )
-from pathlib import Path
-from hashlib import sha256, file_digest
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,6 +43,7 @@ class BackupLocation:
 class S3BackupSync:
     _sleep_time_s: ClassVar[int] = 86400
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
+    _encoding: ClassVar[str] = "utf-8"
     _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (
         ".",
         INCOMPLETE_BACKUP_PREFIX,
@@ -127,7 +128,11 @@ class S3BackupSync:
         self._s3.get_file(
             os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path
         )
-        with open(os.path.join(tmp_directory_path, REMOTE_FILE_LIST), "r") as f:
+        with open(
+            os.path.join(tmp_directory_path, REMOTE_FILE_LIST),
+            "r",
+            encoding=self._encoding,
+        ) as f:
             for line in f.readlines():
                 values = line.rstrip().split(CSV_CELL_DELIMITER)
                 filename = values[0]
@@ -159,7 +164,7 @@ class S3BackupSync:
         remote_directory_path: str,
     ) -> None:
         file_list_local_path = os.path.join(local_directory_path, REMOTE_FILE_LIST)
-        with open(file_list_local_path, "a") as f:
+        with open(file_list_local_path, "a", encoding=self._encoding) as f:
             for backup in backups:
                 self._logger.debug("Adding to file list: %s", backup)
                 f.write(
@@ -170,7 +175,7 @@ class S3BackupSync:
 
     def _get_backup_locations(self) -> list[BackupLocation]:
         backup_locations = []
-        with open(self._backup_directory_list_path, mode="r") as f:
+        with open(self._backup_directory_list_path, "r", encoding=self._encoding) as f:
             for line in f.readlines():
                 local_path, remote_path = line.split(CSV_CELL_DELIMITER)
                 self._logger.info(
@@ -244,5 +249,4 @@ class S3BackupSync:
     @classmethod
     def _get_file_hash(cls, input_file: str) -> str:
         with open(input_file, "rb") as f:
-            digest = file_digest(f, sha256).hexdigest()
-        return digest
+            return file_digest(f, sha256).hexdigest()

@@ -2,8 +2,8 @@ FROM python:3.14-alpine
 
 ENV USER=s3sync
 ENV GROUPNAME=$USER
-ENV UID=1001
-ENV GID=1001
+ENV UID=2222
+ENV GID=3333
 
 RUN addgroup --gid "$GID" "$GROUPNAME" && \
     adduser \

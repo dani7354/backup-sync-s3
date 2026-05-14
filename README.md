@@ -3,21 +3,45 @@
 
 ## Installation
 
-1. `$ python3 -m venv venv/ && source venv/bin/activate`
-2. `$ pip install -r requirements.txt`
-3. `$ s3cmd --configure`. See https://techdocs.akamai.com/cloud-computing/docs/using-s3cmd-with-object-storage
+1. Clone the repository: `git clone https://github.com/dani7354/backup-sync-s3.git`
+2. Create a `.env` file with the required environment variables (see Configuration section below).
+3. Create a backup list file `backups.lst` with the local and remote paths of the backups to be synced (see Configuration section below).
+4. Create an environment-specific `docker-compose.live.yml` file with the relevant mounts and paths (defined in `backup.lst`). See `docker-compose.dev.yml` for inspiration.
+5. `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d`
 
 
 ## Configuration
-`backups.lst` (given as argument when running the script) should contain lines like this:
+
+### Environment variables
+The following environment variables needs to be set in the Docker container. 
+Either in a docker-compose YAML file or in a .env file made available to the container.
+
+See the documentation for your S3 storage provider for the correct values to use. 
+(Linode: https://techdocs.akamai.com/cloud-computing/docs/using-the-aws-sdk-for-python-boto3-with-object-storage#installing-boto3)
 ```
-local_directory;remote_directory
-/path/to/local/dir0;/path/to/remote/dir0
-/another_path/to/local/dir1;/another_path/to/remote/dir1
+S3_BUCKET_NAME=my-backup-bucket
+S3_ENDPOINT_URL=https://s3-endpoint-url
+S3_REGION=s3-region
+S3_ACCESS_KEY=your-access-key-here
+S3_SECRET_KEY=your-secret-key-here
+BACKUP_LIST_PATH=/app/backups.lst
 ```
 
-`files.lst` - placed in each remote directory
+### Backup list
+The `backups.lst` file contains the different backup paths: \
+local path;remote path (in s3 bucket)
+
 ```
-file;uploaded;md5
-backup.tar.gz;2025-11-01;d41d8cd98f00b204e9800998ecf8427e
+/data/backups/0;/0
+/data/backups/2;/2
+```
+
+### Files list
+`files.lst` - placed in each remote directory. 
+`files.lst`, which is mounted to the container, should contain lines like the ones below. The helper script `helpers/create_files_list.py` can be used to generate this list.
+
+Format:
+```
+test_volume/backups/0/testfile_0002.tar.enc;2026-04-16T21:09:41.036838;1172905a4fe58483b2c96955f9e04571f7c68a89f93ce17dedd9b9c33516a886
+test_volume/backups/0/testfile_0001.tar.enc;2026-04-16T21:09:40.563839;7623f7bb2efa64dab2f6d26e60778f1006d9b1d4382383e9979a6d6d3882a18c
 ```

@@ -125,6 +125,10 @@ class S3BackupSync:
         self, remote_directory_path: str, tmp_directory_path: str
     ) -> list[Backup]:
         backups = []
+        if not self._s3.list_files(remote_directory_path):
+            self._logger.warning("No files in remote dir %s", remote_directory_path)
+            return backups
+
         self._s3.get_file(
             os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path
         )

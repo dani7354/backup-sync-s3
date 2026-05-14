@@ -7,7 +7,7 @@
 2. Create a `.env` file with the required environment variables (see Configuration section below).
 3. Create a backup list file `backups.lst` with the local and remote paths of the backups to be synced (see Configuration section below).
 4. Create an environment-specific `docker-compose.live.yml` file with the relevant mounts and paths (defined in `backup.lst`). See `docker-compose.dev.yml` for inspiration.
-5. `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d`
+5. Start the service: `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d`
 
 
 ## Configuration

@@ -19,7 +19,6 @@ ENV VENV_PATH=/opt/venv
 RUN python3 -m venv $VENV_PATH
 ENV PATH="$VENV_PATH/bin:$PATH"
 
-#RUN chown -R "$UID:$GID" "$VENV_PATH"
 RUN chown -R root:root "$VENV_PATH" && chmod -R 755 "$VENV_PATH"
 
 WORKDIR /app

@@ -1,4 +1,6 @@
 # backup-sync-s3
+![Pylint](https://github.com/dani7354/backup-sync-s3/actions/workflows/10-pylint.yml/badge.svg)
+![Docker Image Build and Push](https://github.com/dani7354/backup-sync-s3/actions/workflows/15-build-docker-image.yml/badge.svg)
 
 
 ## Installation

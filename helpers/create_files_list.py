@@ -4,14 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from hashlib import file_digest, sha256
 
-
 FILE_LIST = "files.lst"
 FILE_EXTENSION = ".tar.enc"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 CELL_DELIMITER = ";"
 
 
-def main()  -> None:
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: python create-files-list.py <directory>")
         return
@@ -23,18 +22,22 @@ def main()  -> None:
 
     file_path = Path(FILE_LIST)
     if file_path.exists():
-        print(f"{FILE_LIST} already exists. Remove it first if you want to recreate it.")
+        print(
+            f"{FILE_LIST} already exists. Remove it first if you want to recreate it."
+        )
         return
 
     file_count = 0
-    with open(FILE_LIST, "w") as f_list:
-        for file_path in files_dir.rglob(f'*{FILE_EXTENSION}'):
+    with open(FILE_LIST, "w", encoding="utf-8") as f_list:
+        for file_path in files_dir.rglob(f"*{FILE_EXTENSION}"):
             print(f"Adding file {file_path}...")
             with open(file_path, "rb") as f:
                 digest = file_digest(f, sha256).hexdigest()
             file_created = datetime.fromtimestamp(os.path.getctime(file_path))
             f_list.write(
-                f"{file_path}{CELL_DELIMITER}{file_created.strftime(DATE_FORMAT)}{CELL_DELIMITER}{digest}\n")
+                f"{file_path}{CELL_DELIMITER}{file_created.strftime(DATE_FORMAT)}{CELL_DELIMITER}"
+                f"{digest}\n"
+            )
             print(f"{file_path} - OK!")
             file_count += 1
 

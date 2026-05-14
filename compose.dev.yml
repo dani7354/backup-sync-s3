@@ -1,0 +1,7 @@
+services:
+  s3sync:
+    image: dsp8ef9/s3sync:latest
+    build: .
+    volumes:
+      - ./test_volume:/data:ro
+      - ./backups.lst:/app/backups.lst:ro

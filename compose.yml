@@ -1,8 +1,4 @@
 services:
-  sync:
-    image: dsp8ef9/s3sync:latest
-    build: .
+  s3sync:
+    image: dsp8ef9/backup_sync_s3
     env_file: .env
-    volumes:
-      - ./test_volume:/data:rw
-      - ./backups.lst:/app/backups.lst:ro

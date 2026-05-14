@@ -40,7 +40,7 @@ local path;remote path (in s3 bucket)
 `files.lst` - placed in each remote directory. 
 `files.lst`, which is mounted to the container, should contain lines like the ones below. The helper script `helpers/create_files_list.py` can be used to generate this list.
 
-Format:
+Format: local path;added datetime;file sha256
 ```
 test_volume/backups/0/testfile_0002.tar.enc;2026-04-16T21:09:41.036838;1172905a4fe58483b2c96955f9e04571f7c68a89f93ce17dedd9b9c33516a886
 test_volume/backups/0/testfile_0001.tar.enc;2026-04-16T21:09:40.563839;7623f7bb2efa64dab2f6d26e60778f1006d9b1d4382383e9979a6d6d3882a18c

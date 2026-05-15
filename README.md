@@ -40,7 +40,7 @@ local path;remote path (in s3 bucket)
 
 Make sure that the local paths are mounted to the container and the user that runs the service has read access. If it fails
 with a permission error, the permissions will need to be adjusted on the host machine, which can be done by using chmod or
-setfacl, e.g. `setfacl -R -m u:2222:rx /data/backups/0` (assuming the container runs with user id 2222).
+setfacl, e.g. `setfacl -R -dm u:2222:rx /data/backups/0` (assuming the container runs with user id 2222).
 
 ### Files list
 `files.lst` - placed in each remote directory. 

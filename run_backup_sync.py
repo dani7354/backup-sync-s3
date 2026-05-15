@@ -56,15 +56,12 @@ def _get_backup_list_path() -> pathlib.Path:
 
 def main() -> None:
     _configure_logging()
-    try:
-        backup_directory_list_path = _validate_and_get_backup_list()
+    backup_directory_list_path = _validate_and_get_backup_list()
 
-        s3_config = _get_s3_config()
-        s3 = S3Wrapper(s3_config)
-        s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
-        s3_backup_sync.run_backup_sync()
-    except KeyboardInterrupt as e:
-        _logger.info("Stopping: %s...", e)
+    s3_config = _get_s3_config()
+    s3 = S3Wrapper(s3_config)
+    s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
+    s3_backup_sync.run_backup_sync()
 
 
 if __name__ == "__main__":

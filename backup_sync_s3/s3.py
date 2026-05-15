@@ -151,7 +151,7 @@ class S3Wrapper:
         callback = ProgressCallback(filename, file_size)
 
         self._logger.info(
-            "Downloading s3://%s/%s -> %s", self._bucket_name, key, new_local_file_path
+            "Downloading s3://%s/%s ->   %s", self._bucket_name, key, new_local_file_path
         )
         self._client.download_file(
             self._bucket_name,

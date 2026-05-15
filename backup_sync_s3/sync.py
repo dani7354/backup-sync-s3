@@ -189,7 +189,7 @@ class S3BackupSync:
             for line in f.readlines():
                 local_path, remote_path = line.split(CSV_CELL_DELIMITER)
                 self._logger.info(
-                    "Found backup location — local: %s, remote: %s",
+                    "Found backup location - local: %s, remote: %s",
                     local_path.strip(),
                     remote_path.strip(),
                 )

@@ -27,6 +27,7 @@ S3_REGION=s3-region
 S3_ACCESS_KEY=your-access-key-here
 S3_SECRET_KEY=your-secret-key-here
 BACKUP_LIST_PATH=/app/backups.lst
+TZ=Europe/Paris
 ```
 
 ### Backup list

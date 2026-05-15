@@ -61,29 +61,35 @@ class S3BackupSync:
         self._logger = getLogger(self.__class__.__name__)
 
     def run_backup_sync(self) -> None:
-        fail_count = 0
-        for backup_location in self._get_backup_locations():
+        running = True
+        while running:
             try:
-                with tempfile.TemporaryDirectory(
-                    prefix=self._tmp_directory_prefix
-                ) as tmp_dir:
-                    self._sync_backups(tmp_dir, backup_location)
-            except S3CommandError as e:
-                fail_count += 1
-                self._logger.error(
-                    "Error syncing backups for location %s: %s",
-                    backup_location.remote_path,
-                    e,
-                )
-                self._logger.exception(e)
+                fail_count = 0
+                for backup_location in self._get_backup_locations():
+                    try:
+                        with tempfile.TemporaryDirectory(
+                            prefix=self._tmp_directory_prefix
+                        ) as tmp_dir:
+                            self._sync_backups(tmp_dir, backup_location)
+                    except S3CommandError as e:
+                        fail_count += 1
+                        self._logger.error(
+                            "Error syncing backups for location %s: %s",
+                            backup_location.remote_path,
+                            e,
+                        )
+                        self._logger.exception(e)
 
-        if fail_count:
-            self._logger.warning("Backup sync completed with %d error(s).", fail_count)
-        else:
-            self._logger.info("Backup sync completed successfully.")
+                if fail_count:
+                    self._logger.warning("Backup sync completed with %d error(s).", fail_count)
+                else:
+                    self._logger.info("Backup sync completed successfully.")
 
-        self._logger.info("Going to sleep for %d seconds...", self._sleep_time_s)
-        time.sleep(self._sleep_time_s)
+                self._logger.info("Going to sleep for %d seconds...", self._sleep_time_s)
+                time.sleep(self._sleep_time_s)
+            except KeyboardInterrupt:
+                self._logger.info("Stopping...")
+                running = False
 
     def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
         if backups_to_upload := self._get_backups_to_upload(backup_location, tmp_dir):
@@ -183,7 +189,7 @@ class S3BackupSync:
             for line in f.readlines():
                 local_path, remote_path = line.split(CSV_CELL_DELIMITER)
                 self._logger.info(
-                    "Found backup location — local: %s, remote: %s",
+                    "Found backup location - local: %s, remote: %s",
                     local_path.strip(),
                     remote_path.strip(),
                 )

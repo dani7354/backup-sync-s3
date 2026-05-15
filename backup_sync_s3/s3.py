@@ -137,9 +137,7 @@ class S3Wrapper:
     @Decorator.catch_s3_error_and_raise
     def get_file(self, file_path: str, local_directory_path: str) -> str:
         if not os.path.isdir(local_directory_path):
-            raise ValueError(
-                f"Local directory path {local_directory_path} does not exist"
-            )
+            raise ValueError(f"Local directory path {local_directory_path} does not exist")
 
         filename = os.path.basename(file_path)
         new_local_file_path = os.path.join(local_directory_path, filename)
@@ -150,9 +148,7 @@ class S3Wrapper:
         file_size = self._get_object_size(key)
         callback = ProgressCallback(filename, file_size)
 
-        self._logger.info(
-            "Downloading s3://%s/%s -> %s", self._bucket_name, key, new_local_file_path
-        )
+        self._logger.info("Downloading s3://%s/%s -> %s", self._bucket_name, key, new_local_file_path)
         self._client.download_file(
             self._bucket_name,
             key,
@@ -172,9 +168,7 @@ class S3Wrapper:
         file_size = os.path.getsize(local_file_path)
         callback = ProgressCallback(filename, file_size)
 
-        self._logger.info(
-            "Uploading %s -> s3://%s/%s", local_file_path, self._bucket_name, key
-        )
+        self._logger.info("Uploading %s -> s3://%s/%s", local_file_path, self._bucket_name, key)
         self._client.upload_file(
             local_file_path,
             self._bucket_name,

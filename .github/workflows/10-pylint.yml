@@ -26,6 +26,5 @@ jobs:
           pip install pylint
           export PYTHONPATH=$PYTHONPATH:$(pwd)
       - name: Run pylint
-        run: |
-          python -m pylint . --ignore=venv/ --ignore=helpers/ --disable=C0114,C0115,C0116,R0903,R0902,R0913,R0914
+        run: python -m pylint .
 

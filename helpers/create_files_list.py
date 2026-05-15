@@ -22,9 +22,7 @@ def main() -> None:
 
     file_path = Path(FILE_LIST)
     if file_path.exists():
-        print(
-            f"{FILE_LIST} already exists. Remove it first if you want to recreate it."
-        )
+        print(f"{FILE_LIST} already exists. Remove it first if you want to recreate it.")
         return
 
     file_count = 0
@@ -35,8 +33,7 @@ def main() -> None:
                 digest = file_digest(f, sha256).hexdigest()
             file_created = datetime.fromtimestamp(os.path.getctime(file_path))
             f_list.write(
-                f"{file_path}{CELL_DELIMITER}{file_created.strftime(DATE_FORMAT)}{CELL_DELIMITER}"
-                f"{digest}\n"
+                f"{file_path}{CELL_DELIMITER}{file_created.strftime(DATE_FORMAT)}{CELL_DELIMITER}" f"{digest}\n"
             )
             print(f"{file_path} - OK!")
             file_count += 1

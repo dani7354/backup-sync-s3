@@ -33,9 +33,7 @@ def _configure_logging() -> None:
 def _validate_and_get_backup_list() -> pathlib.Path:
     backup_list_path = pathlib.Path(BACKUP_LIST_PATH)
     if not backup_list_path.is_file():
-        raise FileNotFoundError(
-            f"Backup directory list file {backup_list_path} not found!"
-        )
+        raise FileNotFoundError(f"Backup directory list file {backup_list_path} not found!")
 
     return backup_list_path
 

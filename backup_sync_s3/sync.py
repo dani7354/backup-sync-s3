@@ -53,9 +53,7 @@ class S3BackupSync:
     def __init__(self, s3: S3Wrapper, backup_directory_list_path: Path) -> None:
         self._s3 = s3
         if not os.path.isfile(backup_directory_list_path):
-            raise FileNotFoundError(
-                f"Backup directory list file {backup_directory_list_path} not found!"
-            )
+            raise FileNotFoundError(f"Backup directory list file {backup_directory_list_path} not found!")
         self._backup_directory_list_path = backup_directory_list_path
         self._tmp_directory_path = TMP_DIR_PATH
         self._logger = getLogger(self.__class__.__name__)
@@ -67,9 +65,7 @@ class S3BackupSync:
                 fail_count = 0
                 for backup_location in self._get_backup_locations():
                     try:
-                        with tempfile.TemporaryDirectory(
-                            prefix=self._tmp_directory_prefix
-                        ) as tmp_dir:
+                        with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
                             self._sync_backups(tmp_dir, backup_location)
                     except S3CommandError as e:
                         fail_count += 1
@@ -99,16 +95,12 @@ class S3BackupSync:
                 backup_location.remote_path,
             )
         else:
-            self._logger.info(
-                "No new backups to upload to %s", backup_location.remote_path
-            )
+            self._logger.info("No new backups to upload to %s", backup_location.remote_path)
             return
 
         successful_uploads = []
         failed_upload_count = 0
-        for backup, success in self._upload_backups(
-            backup_location, backups_to_upload
-        ).items():
+        for backup, success in self._upload_backups(backup_location, backups_to_upload).items():
             if success:
                 successful_uploads.append(backup)
             else:
@@ -116,9 +108,7 @@ class S3BackupSync:
 
         if successful_uploads:
             self._logger.info("Adding new backups to file list...")
-            self._add_to_file_list(
-                successful_uploads, tmp_dir, backup_location.remote_path
-            )
+            self._add_to_file_list(successful_uploads, tmp_dir, backup_location.remote_path)
 
         if failed_upload_count:
             self._logger.warning(
@@ -127,17 +117,13 @@ class S3BackupSync:
                 backup_location.remote_path,
             )
 
-    def _read_file_list_backups(
-        self, remote_directory_path: str, tmp_directory_path: str
-    ) -> list[Backup]:
+    def _read_file_list_backups(self, remote_directory_path: str, tmp_directory_path: str) -> list[Backup]:
         backups = []
         if not self._s3.list_files(remote_directory_path):
             self._logger.warning("No files in remote dir %s", remote_directory_path)
             return backups
 
-        self._s3.get_file(
-            os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path
-        )
+        self._s3.get_file(os.path.join(remote_directory_path, REMOTE_FILE_LIST), tmp_directory_path)
         with open(
             os.path.join(tmp_directory_path, REMOTE_FILE_LIST),
             "r",
@@ -156,9 +142,7 @@ class S3BackupSync:
         backups = []
         for file in os.listdir(local_directory_path):
             file_path = os.path.join(local_directory_path, file)
-            if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(
-                file_path
-            ):
+            if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
                 continue
 
             file_hash = self._get_file_hash(file_path)
@@ -177,9 +161,7 @@ class S3BackupSync:
         with open(file_list_local_path, "a", encoding=self._encoding) as f:
             for backup in backups:
                 self._logger.debug("Adding to file list: %s", backup)
-                f.write(
-                    f"{backup.filename};{backup.created.strftime(DATE_FORMAT)};{backup.hash}\n"
-                )
+                f.write(f"{backup.filename};{backup.created.strftime(DATE_FORMAT)};{backup.hash}\n")
 
         self._s3.upload_file(file_list_local_path, remote_directory_path)
 
@@ -193,18 +175,12 @@ class S3BackupSync:
                     local_path.strip(),
                     remote_path.strip(),
                 )
-                backup_locations.append(
-                    BackupLocation(local_path.strip(), remote_path.strip())
-                )
+                backup_locations.append(BackupLocation(local_path.strip(), remote_path.strip()))
 
         return backup_locations
 
-    def _get_backups_to_upload(
-        self, backup_location: BackupLocation, tmp_directory: str
-    ) -> list[Backup]:
-        remote_backups = set(
-            self._read_file_list_backups(backup_location.remote_path, tmp_directory)
-        )
+    def _get_backups_to_upload(self, backup_location: BackupLocation, tmp_directory: str) -> list[Backup]:
+        remote_backups = set(self._read_file_list_backups(backup_location.remote_path, tmp_directory))
         self._logger.info(
             "%d remote backup(s) found in %s",
             len(remote_backups),
@@ -220,16 +196,11 @@ class S3BackupSync:
 
         return list(local_backups - remote_backups)
 
-    def _upload_backups(
-        self, backup_location: BackupLocation, backups: Sequence[Backup]
-    ) -> dict[Backup, bool]:
+    def _upload_backups(self, backup_location: BackupLocation, backups: Sequence[Backup]) -> dict[Backup, bool]:
         backup_upload_status: dict[Backup, bool] = {}
         for backup in backups:
-            local_backup_file_path = os.path.join(
-                backup_location.local_path, backup.filename
-            )
-            backup_digest = self._get_file_hash(local_backup_file_path)
-            new_backup = Backup(local_backup_file_path, backup_digest, datetime.now())
+            local_backup_file_path = os.path.join(backup_location.local_path, backup.filename)
+            new_backup = Backup(local_backup_file_path, backup.hash, datetime.now())
 
             try:
                 self._logger.info(
@@ -237,24 +208,14 @@ class S3BackupSync:
                     local_backup_file_path,
                     backup_location.remote_path,
                 )
-                self._s3.upload_file(
-                    local_backup_file_path, backup_location.remote_path
-                )
+                self._s3.upload_file(local_backup_file_path, backup_location.remote_path)
                 backup_upload_status[new_backup] = True
             except S3CommandError as e:
                 backup_upload_status[new_backup] = False
-                self._logger.error(
-                    "Error uploading backup file %s: %s", backup.filename, e
-                )
+                self._logger.error("Error uploading backup file %s: %s", backup.filename, e)
                 self._logger.exception(e)
 
         return backup_upload_status
-
-    def _is_instance_running(self) -> bool:
-        for item in os.listdir(self._tmp_directory_path):
-            if item.startswith(self._tmp_directory_prefix):
-                return True
-        return False
 
     @classmethod
     def _get_file_hash(cls, input_file: str) -> str:

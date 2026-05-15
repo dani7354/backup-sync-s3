@@ -40,9 +40,7 @@ def main() -> None:
                 bytes_written += chunk
         print(f"{file_path} - OK!")
 
-    print(
-        f"\nDone. {num_files} file(s) of {FILE_SIZE_MB} MB created in '{location_dir}'."
-    )
+    print(f"\nDone. {num_files} file(s) of {FILE_SIZE_MB} MB created in '{location_dir}'.")
 
 
 if __name__ == "__main__":

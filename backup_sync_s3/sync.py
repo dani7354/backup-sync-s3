@@ -3,6 +3,7 @@ import os
 import time
 
 import tempfile
+from dataclasses import field
 from datetime import datetime
 from logging import getLogger
 from typing import ClassVar, Sequence
@@ -21,17 +22,17 @@ from backup_sync_s3.config import (
 
 @dataclasses.dataclass(frozen=True)
 class Backup:
-    filename: str
-    hash: str = dataclasses.field(compare=True)
+    filename: str = field(compare=True)
+    hash: str
     created: datetime
 
     def __hash__(self) -> int:
-        return hash(self.hash)
+        return hash(self.filename)  # In the future, we should use the hash instead - see other comments in this module.
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, Backup):
             return False
-        return self.hash == other.hash
+        return self.filename == other.filename
 
 
 @dataclasses.dataclass(frozen=True)
@@ -44,6 +45,7 @@ class S3BackupSync:
     _sleep_time_s: ClassVar[int] = 86400
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
     _encoding: ClassVar[str] = "utf-8"
+    _default_backup_hash: ClassVar[str] = "x"
     _invalid_backup_prefixes: ClassVar[tuple[str, ...]] = (
         ".",
         INCOMPLETE_BACKUP_PREFIX,
@@ -145,9 +147,9 @@ class S3BackupSync:
             if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
                 continue
 
-            file_hash = self._get_file_hash(file_path)
+            file_hash = self._default_backup_hash  # Should be self._get_file_hash(file_path), but now it takes too long
             created_time = datetime.fromtimestamp(os.path.getctime(file_path))
-            backups.append(Backup(file, file_hash, created_time))
+            backups.append(Backup(file_path, file_hash, created_time))
 
         return backups
 
@@ -194,7 +196,10 @@ class S3BackupSync:
             backup_location.local_path,
         )
 
-        return list(local_backups - remote_backups)
+        # make diff on name instead of hash because of performance issues.
+        remote_backup_names = set(x.filename for x in remote_backups)
+
+        return list(x for x in local_backups if x.filename not in remote_backup_names)
 
     def _upload_backups(self, backup_location: BackupLocation, backups: Sequence[Backup]) -> dict[Backup, bool]:
         backup_upload_status: dict[Backup, bool] = {}

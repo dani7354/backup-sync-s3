@@ -1,11 +1,10 @@
 #!/bin/bash
 
 
-[[ -n "$1" && -n "$2" && -n "$3"  ]] || { echo "Usage: $(basename "$0") <input dir> <destination dir> <exclude list>"; exit 0; }
+[[ -n "$1" && -n "$2" ]] || { echo "Usage: $(basename "$0") <input dir> <destination dir>"; exit 0; }
 
 declare -r input_dir="$1"
 declare -r destination_dir="$2"
-declare -r exclude_list="$3"
 
 declare -r key_id="" # Set the GPG recipient key ID here!
 declare -r date_format="+%Y%m%d%H%M%S"
@@ -29,7 +28,6 @@ remove_or_fail() {
 
 [[ -d "$destination_dir" ]] || exit_on_error "Destination ${destination_dir} doesn't exist!"
 [[ -d "$input_dir" ]] || exist_on_error "Destination ${destination_dir} doesn't exist!"
-[[ -f "$exclude_list" ]] || exit_on_error "Exclude list ${exclude_list} doesn't exist!"
 
 [[ -x $(which gpg) ]] || exit_on_error "gpg is not installed on your system!"
 [[ -x $(which tar) ]] || exit_on_error "tar is not installed on your system!"

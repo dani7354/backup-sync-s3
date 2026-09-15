@@ -92,7 +92,7 @@ class S3BackupSync:
             case SyncInterval.WEEKLY:
                 schedule.every().week.do(run_threaded, self.run_backup_sync)
 
-        self._logger.info("Backup sync will run every %s.", SYNC_RUN_INTERVAL.name)
+        self._logger.info("Backup sync will run %s.", SYNC_RUN_INTERVAL.name)
 
     def run_backup_sync(self) -> None:
         if not self._set_sync_running(is_running=True):

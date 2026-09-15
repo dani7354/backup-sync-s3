@@ -55,7 +55,7 @@ def main() -> None:
     s3_config = _get_s3_config()
     s3 = S3Wrapper(s3_config)
     s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
-    s3_backup_sync.run_backup_sync()
+    s3_backup_sync.run()
 
 
 if __name__ == "__main__":

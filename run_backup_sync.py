@@ -48,10 +48,6 @@ def _get_s3_config() -> S3Config:
     )
 
 
-def _get_backup_list_path() -> pathlib.Path:
-    return pathlib.Path(BACKUP_LIST_PATH)
-
-
 def main() -> None:
     _configure_logging()
     backup_directory_list_path = _validate_and_get_backup_list()

@@ -2,7 +2,6 @@ import dataclasses
 import functools
 import logging
 import os
-import threading
 from datetime import datetime
 
 import boto3
@@ -36,43 +35,6 @@ class S3FileInfo:
     path: str
     size_gb: float
     uploaded: datetime
-
-
-class ProgressCallback:
-    """Callable passed to boto3 Callback= to log transfer progress.
-
-    Thread-safe: boto3 invokes the callback from multiple threads concurrently
-    when use_threads=True is set in TransferConfig (multipart transfers).
-    """
-
-    def __init__(self, filename: str, file_size: int) -> None:
-        self._filename = filename
-        self._file_size = file_size
-        self._transferred = 0
-        self._lock = threading.Lock()
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def __call__(self, bytes_amount: int) -> None:
-        with self._lock:
-            self._transferred += bytes_amount
-            transferred = self._transferred  # capture snapshot outside lock scope
-
-        if self._file_size > 0:
-            pct = (transferred / self._file_size) * 100
-            self._logger.debug(
-                "%s: %s / %s bytes (%.1f%%)",
-                self._filename,
-                f"{transferred:,}",
-                f"{self._file_size:,}",
-                pct,
-            )
-
-        if transferred >= self._file_size > 0:
-            self._logger.info(
-                "Transfer of %s completed: %s bytes",
-                self._filename,
-                f"{self._file_size:,}",
-            )
 
 
 class S3Wrapper:
@@ -146,16 +108,14 @@ class S3Wrapper:
 
         key = self._fix_path(file_path)
         file_size = self._get_object_size(key)
-        callback = ProgressCallback(filename, file_size)
+        self._logger.info(
+            "Downloading s3://%s/%s -> %s (%d bytes)", self._bucket_name, key, new_local_file_path, file_size)
 
-        self._logger.info("Downloading s3://%s/%s -> %s", self._bucket_name, key, new_local_file_path)
         self._client.download_file(
             self._bucket_name,
             key,
             new_local_file_path,
-            Config=self._transfer_config,
-            Callback=callback,
-        )
+            Config=self._transfer_config)
         return new_local_file_path
 
     @Decorator.catch_s3_error_and_raise
@@ -166,15 +126,15 @@ class S3Wrapper:
         filename = os.path.basename(local_file_path)
         key = f"{self._fix_path(destination_directory_path)}/{filename}"
         file_size = os.path.getsize(local_file_path)
-        callback = ProgressCallback(filename, file_size)
 
-        self._logger.info("Uploading %s -> s3://%s/%s", local_file_path, self._bucket_name, key)
+        self._logger.info(
+            "Uploading %s -> s3://%s/%s (%d bytes)", local_file_path, self._bucket_name, key, file_size)
+
         self._client.upload_file(
             local_file_path,
             self._bucket_name,
             key,
             Config=self._transfer_config,
-            Callback=callback,
         )
         return f"s3://{self._bucket_name}/{key}"
 

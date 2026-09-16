@@ -25,6 +25,7 @@ class EnvVar(StrEnum):
     BACKUP_LIST_PATH = "BACKUP_LIST_PATH"
     MAX_THREAD_COUNT = "MAX_THREAD_COUNT"
     SYNC_RUN_INTERVAL = "SYNC_RUN_INTERVAL"
+    USE_HASH_FOR_COMPARISON = "USE_HASH_FOR_COMPARISON"
 
 
 class SyncInterval(StrEnum):
@@ -39,6 +40,12 @@ def require_env_var(name: str) -> str:
     return value
 
 
+def parse_bool_env_var(name: str, default: bool = False) -> bool:
+    if not (value := os.environ.get(name)):
+        return default
+    return value.lower() in ("true", "1")
+
+
 MULTIPART_MAX_CONCURRENCY = int(os.environ.get(EnvVar.MAX_THREAD_COUNT, DEFAULT_MAX_THREAD_COUNT_FOR_UPLOAD))
 S3_BUCKET_NAME = require_env_var(EnvVar.S3_BUCKET_NAME)
 S3_ENDPOINT_URL = require_env_var(EnvVar.S3_ENDPOINT_URL)
@@ -47,3 +54,4 @@ S3_ACCESS_KEY = require_env_var(EnvVar.S3_ACCESS_KEY)
 S3_SECRET_KEY = require_env_var(EnvVar.S3_SECRET_KEY)
 BACKUP_LIST_PATH = require_env_var(EnvVar.BACKUP_LIST_PATH)
 SYNC_RUN_INTERVAL = SyncInterval(require_env_var(EnvVar.SYNC_RUN_INTERVAL))
+USE_HASH_FOR_COMPARISON = parse_bool_env_var(EnvVar.USE_HASH_FOR_COMPARISON, default=False)

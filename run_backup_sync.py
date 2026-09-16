@@ -2,6 +2,7 @@ import logging
 import pathlib
 
 from pathlib import Path
+
 from backup_sync_s3.s3 import S3Wrapper, S3Config
 from backup_sync_s3.sync import S3BackupSync
 from backup_sync_s3.config import (

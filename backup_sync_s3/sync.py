@@ -33,7 +33,7 @@ class Backup:
     def __hash__(self) -> int:
         return hash(self.filename)  # In the future, we should use the hash instead - see other comments in this module.
 
-    def __eq__(self, other: "Backup") -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Backup):
             return False
 
@@ -100,26 +100,30 @@ class S3BackupSync:
             self._logger.warning("Backup sync is already running. Skipping...")
             return
 
-        fail_count = 0
-        for backup_location in self._get_backup_locations():
-            try:
-                with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
-                    self._sync_backups(tmp_dir, backup_location)
-            except S3CommandError as e:
-                fail_count += 1
-                self._logger.error(
-                    "Error syncing backups for location %s: %s",
-                    backup_location.remote_path,
-                    e,
-                )
-                self._logger.exception(e)
+        try:
+            fail_count = 0
+            for backup_location in self._get_backup_locations():
+                try:
+                    with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
+                        self._sync_backups(tmp_dir, backup_location)
+                except S3CommandError as e:
+                    fail_count += 1
+                    self._logger.error(
+                        "Error syncing backups for location %s: %s",
+                        backup_location.remote_path,
+                        e,
+                    )
+                    self._logger.exception(e)
 
-        if fail_count:
-            self._logger.warning("Backup sync completed with %d error(s).", fail_count)
-        else:
-            self._logger.info("Backup sync completed successfully.")
-
-        self._set_sync_running(is_running=False)
+            if fail_count:
+                self._logger.warning("Backup sync completed with %d error(s).", fail_count)
+            else:
+                self._logger.info("Backup sync completed successfully.")
+        except Exception as e:
+            self._logger.error("Unexpected error during backup sync: %s", e)
+            self._logger.exception(e)
+        finally:
+            self._set_sync_running(is_running=False)
 
     def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
         if backups_to_upload := self._get_backups_to_upload(backup_location, tmp_dir):

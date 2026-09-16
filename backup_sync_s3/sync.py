@@ -119,7 +119,7 @@ class S3BackupSync:
                 self._logger.warning("Backup sync completed with %d error(s).", fail_count)
             else:
                 self._logger.info("Backup sync completed successfully.")
-        except Exception as e:
+        except (OSError, ValueError, AttributeError) as e:
             self._logger.error("Unexpected error during backup sync: %s", e)
             self._logger.exception(e)
         finally:

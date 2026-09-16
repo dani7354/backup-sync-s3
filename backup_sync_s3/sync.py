@@ -62,6 +62,10 @@ class S3BackupSync:
             (lambda x: x.hash) if USE_HASH_FOR_COMPARISON else (lambda x: x.filename)
         )
 
+        self._default_hash_func: Callable[[str], str] = (
+            self._get_file_hash if USE_HASH_FOR_COMPARISON else (lambda x: self._default_backup_hash)
+        )
+
         self._logger = getLogger(self.__class__.__name__)
 
     def run(self) -> None:

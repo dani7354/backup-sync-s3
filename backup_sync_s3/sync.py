@@ -1,7 +1,6 @@
 import dataclasses
 import os
 import time
-import schedule
 
 import tempfile
 from dataclasses import field
@@ -12,6 +11,7 @@ from pathlib import Path
 from hashlib import sha256, file_digest
 from threading import Thread, Lock
 
+import schedule
 from backup_sync_s3.s3 import S3Wrapper, S3CommandError
 from backup_sync_s3.config import (
     INCOMPLETE_BACKUP_PREFIX,

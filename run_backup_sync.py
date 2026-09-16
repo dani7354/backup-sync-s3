@@ -60,7 +60,7 @@ def main() -> None:
         s3_backup_sync.run()
     except Exception as e:
         _logger.exception("An error occurred during backup sync: %s", e)
-        raise SystemExit(1)
+        raise SystemExit(1) from e
 
 
 if __name__ == "__main__":

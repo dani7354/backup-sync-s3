@@ -6,7 +6,7 @@ import tempfile
 from dataclasses import field
 from datetime import datetime
 from logging import getLogger
-from typing import ClassVar, Sequence
+from typing import ClassVar, Sequence, Callable
 from pathlib import Path
 from hashlib import sha256, file_digest
 from threading import Thread, Lock
@@ -20,24 +20,16 @@ from backup_sync_s3.config import (
     DATE_FORMAT,
     CSV_CELL_DELIMITER,
     SYNC_RUN_INTERVAL,
+    USE_HASH_FOR_COMPARISON,
     SyncInterval,
 )
 
 
 @dataclasses.dataclass(frozen=True)
 class Backup:
-    filename: str = field(compare=True)
+    filename: str
     hash: str
     created: datetime
-
-    def __hash__(self) -> int:
-        return hash(self.filename)  # In the future, we should use the hash instead - see other comments in this module.
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Backup):
-            return False
-
-        return self.filename == other.filename
 
 
 @dataclasses.dataclass(frozen=True)
@@ -66,6 +58,11 @@ class S3BackupSync:
         self._tmp_directory_path = TMP_DIR_PATH
         self._is_sync_running = False
         self._lock = Lock()
+
+        self._read_backup_id_func: Callable[[Backup], str] = (
+            (lambda x: x.hash) if USE_HASH_FOR_COMPARISON else (lambda x: x.filename)
+        )
+
         self._logger = getLogger(self.__class__.__name__)
 
     def run(self) -> None:
@@ -183,7 +180,7 @@ class S3BackupSync:
             if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
                 continue
 
-            file_hash = self._default_backup_hash  # Should be self._get_file_hash(file_path), but now it takes too long
+            file_hash = self._get_file_hash(file_path)
             created_time = datetime.fromtimestamp(os.path.getctime(file_path))
             backups.append(Backup(file_path, file_hash, created_time))
 
@@ -218,24 +215,23 @@ class S3BackupSync:
         return backup_locations
 
     def _get_backups_to_upload(self, backup_location: BackupLocation, tmp_directory: str) -> list[Backup]:
-        remote_backups = set(self._read_file_list_backups(backup_location.remote_path, tmp_directory))
+        remote_backups = self._read_file_list_backups(backup_location.remote_path, tmp_directory)
         self._logger.info(
             "%d remote backup(s) found in %s",
             len(remote_backups),
             backup_location.remote_path,
         )
 
-        local_backups = set(self._get_local_backups(backup_location.local_path))
+        local_backups = self._get_local_backups(backup_location.local_path)
         self._logger.info(
             "%d local backup(s) found in %s",
             len(local_backups),
             backup_location.local_path,
         )
 
-        # make diff on name instead of hash because of performance issues.
-        remote_backup_names = set(x.filename for x in remote_backups)
+        backup_identifiers = set(self._read_backup_id_func(x) for x in remote_backups)
 
-        return list(x for x in local_backups if x.filename not in remote_backup_names)
+        return list(x for x in local_backups if self._read_backup_id_func(x) not in backup_identifiers)
 
     def _upload_backups(self, backup_location: BackupLocation, backups: Sequence[Backup]) -> dict[Backup, bool]:
         backup_upload_status: dict[Backup, bool] = {}

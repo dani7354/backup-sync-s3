@@ -9,7 +9,9 @@ from logging import getLogger
 from typing import ClassVar, Sequence
 from pathlib import Path
 from hashlib import sha256, file_digest
+from threading import Thread, Lock
 
+import schedule
 from backup_sync_s3.s3 import S3Wrapper, S3CommandError
 from backup_sync_s3.config import (
     INCOMPLETE_BACKUP_PREFIX,
@@ -17,6 +19,8 @@ from backup_sync_s3.config import (
     REMOTE_FILE_LIST,
     DATE_FORMAT,
     CSV_CELL_DELIMITER,
+    SYNC_RUN_INTERVAL,
+    SyncInterval,
 )
 
 
@@ -29,9 +33,10 @@ class Backup:
     def __hash__(self) -> int:
         return hash(self.filename)  # In the future, we should use the hash instead - see other comments in this module.
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Backup):
             return False
+
         return self.filename == other.filename
 
 
@@ -56,38 +61,69 @@ class S3BackupSync:
         self._s3 = s3
         if not os.path.isfile(backup_directory_list_path):
             raise FileNotFoundError(f"Backup directory list file {backup_directory_list_path} not found!")
+
         self._backup_directory_list_path = backup_directory_list_path
         self._tmp_directory_path = TMP_DIR_PATH
+        self._is_sync_running = False
+        self._lock = Lock()
         self._logger = getLogger(self.__class__.__name__)
 
-    def run_backup_sync(self) -> None:
-        running = True
-        while running:
+    def run(self) -> None:
+        self._run_backup_sync()
+        self._set_up_scheduled_sync()
+
+        while True:
             try:
-                fail_count = 0
-                for backup_location in self._get_backup_locations():
-                    try:
-                        with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
-                            self._sync_backups(tmp_dir, backup_location)
-                    except S3CommandError as e:
-                        fail_count += 1
-                        self._logger.error(
-                            "Error syncing backups for location %s: %s",
-                            backup_location.remote_path,
-                            e,
-                        )
-                        self._logger.exception(e)
-
-                if fail_count:
-                    self._logger.warning("Backup sync completed with %d error(s).", fail_count)
-                else:
-                    self._logger.info("Backup sync completed successfully.")
-
-                self._logger.info("Going to sleep for %d seconds...", self._sleep_time_s)
-                time.sleep(self._sleep_time_s)
+                schedule.run_pending()
+                time.sleep(1)
             except KeyboardInterrupt:
                 self._logger.info("Stopping...")
-                running = False
+                break
+
+    def _set_up_scheduled_sync(self) -> None:
+        def run_threaded(func):
+            thread = Thread(target=func)
+            thread.start()
+
+        match SYNC_RUN_INTERVAL:
+            case SyncInterval.HOURLY:
+                schedule.every().hour.do(run_threaded, self._run_backup_sync)
+            case SyncInterval.DAILY:
+                schedule.every().day.do(run_threaded, self._run_backup_sync)
+            case SyncInterval.WEEKLY:
+                schedule.every().week.do(run_threaded, self._run_backup_sync)
+
+        self._logger.info("Backup sync will run %s.", SYNC_RUN_INTERVAL.name)
+
+    def _run_backup_sync(self) -> None:
+        if not self._set_sync_running(is_running=True):
+            self._logger.warning("Backup sync is already running. Skipping...")
+            return
+
+        try:
+            fail_count = 0
+            for backup_location in self._get_backup_locations():
+                try:
+                    with tempfile.TemporaryDirectory(prefix=self._tmp_directory_prefix) as tmp_dir:
+                        self._sync_backups(tmp_dir, backup_location)
+                except S3CommandError as e:
+                    fail_count += 1
+                    self._logger.error(
+                        "Error syncing backups for location %s: %s",
+                        backup_location.remote_path,
+                        e,
+                    )
+                    self._logger.exception(e)
+
+            if fail_count:
+                self._logger.warning("Backup sync completed with %d error(s).", fail_count)
+            else:
+                self._logger.info("Backup sync completed successfully.")
+        except (OSError, ValueError, AttributeError) as e:
+            self._logger.error("Unexpected error during backup sync: %s", e)
+            self._logger.exception(e)
+        finally:
+            self._set_sync_running(is_running=False)
 
     def _sync_backups(self, tmp_dir: str, backup_location: BackupLocation) -> None:
         if backups_to_upload := self._get_backups_to_upload(backup_location, tmp_dir):
@@ -221,6 +257,14 @@ class S3BackupSync:
                 self._logger.exception(e)
 
         return backup_upload_status
+
+    def _set_sync_running(self, is_running: bool) -> bool:
+        with self._lock:
+            if is_running and self._is_sync_running:
+                return False
+
+            self._is_sync_running = is_running
+            return True
 
     @classmethod
     def _get_file_hash(cls, input_file: str) -> str:

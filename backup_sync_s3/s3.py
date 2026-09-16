@@ -2,7 +2,6 @@ import dataclasses
 import functools
 import logging
 import os
-import threading
 from datetime import datetime
 
 import boto3
@@ -38,43 +37,6 @@ class S3FileInfo:
     uploaded: datetime
 
 
-class ProgressCallback:
-    """Callable passed to boto3 Callback= to log transfer progress.
-
-    Thread-safe: boto3 invokes the callback from multiple threads concurrently
-    when use_threads=True is set in TransferConfig (multipart transfers).
-    """
-
-    def __init__(self, filename: str, file_size: int) -> None:
-        self._filename = filename
-        self._file_size = file_size
-        self._transferred = 0
-        self._lock = threading.Lock()
-        self._logger = logging.getLogger(self.__class__.__name__)
-
-    def __call__(self, bytes_amount: int) -> None:
-        with self._lock:
-            self._transferred += bytes_amount
-            transferred = self._transferred  # capture snapshot outside lock scope
-
-        if self._file_size > 0:
-            pct = (transferred / self._file_size) * 100
-            self._logger.debug(
-                "%s: %s / %s bytes (%.1f%%)",
-                self._filename,
-                f"{transferred:,}",
-                f"{self._file_size:,}",
-                pct,
-            )
-
-        if transferred >= self._file_size > 0:
-            self._logger.info(
-                "Transfer of %s completed: %s bytes",
-                self._filename,
-                f"{self._file_size:,}",
-            )
-
-
 class S3Wrapper:
     """Thin wrapper around the boto3 S3 client.
 
@@ -99,6 +61,16 @@ class S3Wrapper:
             max_concurrency=MULTIPART_MAX_CONCURRENCY,
         )
         self._logger = logging.getLogger(self.__class__.__name__)
+
+        self._logger.info(
+            "%s initialized with bucket=%s, endpoint=%s, region=%s",
+            self.__class__.__name__,
+            self._bucket_name,
+            config.endpoint_url,
+            config.region,
+        )
+
+        self._logger.debug("%d max concurrent threads for multipart transfers", MULTIPART_MAX_CONCURRENCY)
 
     class Decorator:
         @classmethod
@@ -146,16 +118,12 @@ class S3Wrapper:
 
         key = self._fix_path(file_path)
         file_size = self._get_object_size(key)
-        callback = ProgressCallback(filename, file_size)
-
-        self._logger.info("Downloading s3://%s/%s -> %s", self._bucket_name, key, new_local_file_path)
-        self._client.download_file(
-            self._bucket_name,
-            key,
-            new_local_file_path,
-            Config=self._transfer_config,
-            Callback=callback,
+        readable_file_size = self._format_file_size(file_size)
+        self._logger.info(
+            "Downloading s3://%s/%s -> %s (%s)", self._bucket_name, key, new_local_file_path, readable_file_size
         )
+
+        self._client.download_file(self._bucket_name, key, new_local_file_path, Config=self._transfer_config)
         return new_local_file_path
 
     @Decorator.catch_s3_error_and_raise
@@ -166,15 +134,17 @@ class S3Wrapper:
         filename = os.path.basename(local_file_path)
         key = f"{self._fix_path(destination_directory_path)}/{filename}"
         file_size = os.path.getsize(local_file_path)
-        callback = ProgressCallback(filename, file_size)
 
-        self._logger.info("Uploading %s -> s3://%s/%s", local_file_path, self._bucket_name, key)
+        readable_file_size = self._format_file_size(file_size)
+        self._logger.info(
+            "Uploading %s -> s3://%s/%s (%s)", local_file_path, self._bucket_name, key, readable_file_size
+        )
+
         self._client.upload_file(
             local_file_path,
             self._bucket_name,
             key,
             Config=self._transfer_config,
-            Callback=callback,
         )
         return f"s3://{self._bucket_name}/{key}"
 
@@ -189,3 +159,15 @@ class S3Wrapper:
     @staticmethod
     def _fix_path(path: str) -> str:
         return path.strip("/")
+
+    @staticmethod
+    def _format_file_size(size_bytes: int) -> str:
+        """Return a human-readable string representation of a file size in bytes."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        if size_bytes < 1024**2:
+            return f"{size_bytes / 1024:.2f} KB"
+        if size_bytes < 1024**3:
+            return f"{size_bytes / 1024**2:.2f} MB"
+
+        return f"{size_bytes / 1024**3:.2f} GB"

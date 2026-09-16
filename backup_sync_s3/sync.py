@@ -33,7 +33,7 @@ class Backup:
     def __hash__(self) -> int:
         return hash(self.filename)  # In the future, we should use the hash instead - see other comments in this module.
 
-    def __eq__(self, other: Backup) -> bool:
+    def __eq__(self, other: "Backup") -> bool:
         if not isinstance(other, Backup):
             return False
 

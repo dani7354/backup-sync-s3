@@ -27,6 +27,8 @@ S3_REGION=s3-region
 S3_ACCESS_KEY=your-access-key-here
 S3_SECRET_KEY=your-secret-key-here
 BACKUP_LIST_PATH=/app/backups.lst
+SYNC_RUN_INTERVAL=hourly # hourly, daily or weekly
+MAX_THREAD_COUNT=8 # default: 6
 TZ=Europe/Paris
 ```
 

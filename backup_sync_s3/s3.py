@@ -64,7 +64,11 @@ class S3Wrapper:
 
         self._logger.info(
             "%s initialized with bucket=%s, endpoint=%s, region=%s",
-            self.__class__.__name__, self._bucket_name, config.endpoint_url, config.region)
+            self.__class__.__name__,
+            self._bucket_name,
+            config.endpoint_url,
+            config.region,
+        )
 
         self._logger.debug("%d max concurrent threads for multipart transfers", MULTIPART_MAX_CONCURRENCY)
 
@@ -116,14 +120,10 @@ class S3Wrapper:
         file_size = self._get_object_size(key)
         readable_file_size = self._format_file_size(file_size)
         self._logger.info(
-            "Downloading s3://%s/%s -> %s (%s)",
-            self._bucket_name, key, new_local_file_path, readable_file_size)
+            "Downloading s3://%s/%s -> %s (%s)", self._bucket_name, key, new_local_file_path, readable_file_size
+        )
 
-        self._client.download_file(
-            self._bucket_name,
-            key,
-            new_local_file_path,
-            Config=self._transfer_config)
+        self._client.download_file(self._bucket_name, key, new_local_file_path, Config=self._transfer_config)
         return new_local_file_path
 
     @Decorator.catch_s3_error_and_raise
@@ -137,7 +137,8 @@ class S3Wrapper:
 
         readable_file_size = self._format_file_size(file_size)
         self._logger.info(
-            "Uploading %s -> s3://%s/%s (%s)", local_file_path, self._bucket_name, key, readable_file_size)
+            "Uploading %s -> s3://%s/%s (%s)", local_file_path, self._bucket_name, key, readable_file_size
+        )
 
         self._client.upload_file(
             local_file_path,

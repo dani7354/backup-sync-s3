@@ -1,7 +1,6 @@
 import os
 from enum import StrEnum
 
-
 # Multipart thresholds — files above MULTIPART_THRESHOLD are uploaded/downloaded
 # in MULTIPART_CHUNK_SIZE pieces using multiple threads; files are never fully
 # read into memory at any point.

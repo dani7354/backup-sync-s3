@@ -20,7 +20,7 @@ from backup_sync_s3.config import (
     DATE_FORMAT,
     CSV_CELL_DELIMITER,
     SYNC_RUN_INTERVAL,
-    SyncInterval
+    SyncInterval,
 )
 
 

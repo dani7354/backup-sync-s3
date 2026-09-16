@@ -10,7 +10,7 @@ from backup_sync_s3.config import (
     S3_REGION,
     S3_ACCESS_KEY,
     S3_SECRET_KEY,
-    BACKUP_LIST_PATH
+    BACKUP_LIST_PATH,
 )
 
 _logger = logging.getLogger(__name__)

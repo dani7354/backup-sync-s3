@@ -19,7 +19,8 @@ from backup_sync_s3.config import (
     REMOTE_FILE_LIST,
     DATE_FORMAT,
     CSV_CELL_DELIMITER,
-    SYNC_RUN_INTERVAL, SyncInterval
+    SYNC_RUN_INTERVAL,
+    SyncInterval
 )
 
 
@@ -68,8 +69,8 @@ class S3BackupSync:
         self._logger = getLogger(self.__class__.__name__)
 
     def run(self) -> None:
-        self.run_backup_sync()
-        self.set_up_scheduled_sync()
+        self._run_backup_sync()
+        self._set_up_scheduled_sync()
 
         while True:
             try:
@@ -79,22 +80,22 @@ class S3BackupSync:
                 self._logger.info("Stopping...")
                 break
 
-    def set_up_scheduled_sync(self) -> None:
+    def _set_up_scheduled_sync(self) -> None:
         def run_threaded(func):
             thread = Thread(target=func)
             thread.start()
 
         match SYNC_RUN_INTERVAL:
             case SyncInterval.HOURLY:
-                schedule.every().hour.do(run_threaded, self.run_backup_sync)
+                schedule.every().hour.do(run_threaded, self._run_backup_sync)
             case SyncInterval.DAILY:
-                schedule.every().day.do(run_threaded, self.run_backup_sync)
+                schedule.every().day.do(run_threaded, self._run_backup_sync)
             case SyncInterval.WEEKLY:
-                schedule.every().week.do(run_threaded, self.run_backup_sync)
+                schedule.every().week.do(run_threaded, self._run_backup_sync)
 
         self._logger.info("Backup sync will run %s.", SYNC_RUN_INTERVAL.name)
 
-    def run_backup_sync(self) -> None:
+    def _run_backup_sync(self) -> None:
         if not self._set_sync_running(is_running=True):
             self._logger.warning("Backup sync is already running. Skipping...")
             return

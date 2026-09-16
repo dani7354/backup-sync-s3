@@ -1,6 +1,7 @@
 import logging
 import pathlib
 
+from pathlib import Path
 from backup_sync_s3.s3 import S3Wrapper, S3Config
 from backup_sync_s3.sync import S3BackupSync
 from backup_sync_s3.config import (
@@ -9,7 +10,7 @@ from backup_sync_s3.config import (
     S3_REGION,
     S3_ACCESS_KEY,
     S3_SECRET_KEY,
-    BACKUP_LIST_PATH,
+    BACKUP_LIST_PATH
 )
 
 _logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ def _configure_logging() -> None:
 
 
 def _validate_and_get_backup_list() -> pathlib.Path:
-    backup_list_path = pathlib.Path(BACKUP_LIST_PATH)
+    backup_list_path = Path(BACKUP_LIST_PATH)
     if not backup_list_path.is_file():
         raise FileNotFoundError(f"Backup directory list file {backup_list_path} not found!")
 
@@ -49,13 +50,17 @@ def _get_s3_config() -> S3Config:
 
 
 def main() -> None:
-    _configure_logging()
-    backup_directory_list_path = _validate_and_get_backup_list()
+    try:
+        _configure_logging()
+        backup_directory_list_path = _validate_and_get_backup_list()
 
-    s3_config = _get_s3_config()
-    s3 = S3Wrapper(s3_config)
-    s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
-    s3_backup_sync.run()
+        s3_config = _get_s3_config()
+        s3 = S3Wrapper(s3_config)
+        s3_backup_sync = S3BackupSync(s3, backup_directory_list_path)
+        s3_backup_sync.run()
+    except Exception as e:
+        _logger.exception("An error occurred during backup sync: %s", e)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

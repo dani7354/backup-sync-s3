@@ -62,6 +62,12 @@ class S3Wrapper:
         )
         self._logger = logging.getLogger(self.__class__.__name__)
 
+        self._logger.info(
+            "%s initialized with bucket=%s, endpoint=%s, region=%s",
+            self.__class__.__name__, self._bucket_name, config.endpoint_url, config.region)
+
+        self._logger.debug("%d max concurrent threads for multipart transfers", MULTIPART_MAX_CONCURRENCY)
+
     class Decorator:
         @classmethod
         def catch_s3_error_and_raise(cls, func):
@@ -108,8 +114,10 @@ class S3Wrapper:
 
         key = self._fix_path(file_path)
         file_size = self._get_object_size(key)
+        readable_file_size = self._format_file_size(file_size)
         self._logger.info(
-            "Downloading s3://%s/%s -> %s (%d bytes)", self._bucket_name, key, new_local_file_path, file_size)
+            "Downloading s3://%s/%s -> %s (%s)",
+            self._bucket_name, key, new_local_file_path, readable_file_size)
 
         self._client.download_file(
             self._bucket_name,
@@ -127,8 +135,9 @@ class S3Wrapper:
         key = f"{self._fix_path(destination_directory_path)}/{filename}"
         file_size = os.path.getsize(local_file_path)
 
+        readable_file_size = self._format_file_size(file_size)
         self._logger.info(
-            "Uploading %s -> s3://%s/%s (%d bytes)", local_file_path, self._bucket_name, key, file_size)
+            "Uploading %s -> s3://%s/%s (%s)", local_file_path, self._bucket_name, key, readable_file_size)
 
         self._client.upload_file(
             local_file_path,
@@ -149,3 +158,15 @@ class S3Wrapper:
     @staticmethod
     def _fix_path(path: str) -> str:
         return path.strip("/")
+
+    @staticmethod
+    def _format_file_size(size_bytes: int) -> str:
+        """Return a human-readable string representation of a file size in bytes."""
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024**2:
+            return f"{size_bytes / 1024:.2f} KB"
+        elif size_bytes < 1024**3:
+            return f"{size_bytes / 1024**2:.2f} MB"
+        else:
+            return f"{size_bytes / 1024**3:.2f} GB"

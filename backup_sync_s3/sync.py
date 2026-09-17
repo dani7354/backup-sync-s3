@@ -183,7 +183,7 @@ class S3BackupSync:
             if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
                 continue
 
-            file_hash = self._get_file_hash(file_path)
+            file_hash = self._default_hash_func(file_path)
             created_time = datetime.fromtimestamp(os.path.getctime(file_path))
             backups.append(Backup(file_path, file_hash, created_time))
 

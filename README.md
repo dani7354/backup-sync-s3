@@ -11,6 +11,18 @@
 4. Create an environment-specific `docker-compose.live.yml` file with the relevant mounts and paths (defined in `backup.lst`). See `docker-compose.dev.yml` for inspiration.
 5. Start the service: `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d`
 
+## Local development
+
+Install the project and its development tools in a virtual environment:
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+Run the service locally with `backup-sync-s3` after setting the required environment variables.
+
 
 ## Configuration
 
@@ -21,6 +33,7 @@ Either in a docker-compose YAML file or in a .env file made available to the con
 See the documentation for your S3 storage provider for the correct values to use. 
 (Linode: https://techdocs.akamai.com/cloud-computing/docs/using-the-aws-sdk-for-python-boto3-with-object-storage#installing-boto3)
 ```
+DEBUG=false
 S3_BUCKET_NAME=my-backup-bucket
 S3_ENDPOINT_URL=https://s3-endpoint-url
 S3_REGION=s3-region

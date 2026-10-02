@@ -1,8 +1,14 @@
 [MASTER]
-ignore=venv,helpers
+ignore=venv,.venv,helpers,build
 
 [MESSAGES CONTROL]
 disable=C0114,C0115,C0116,R0903,R0902,R0913,R0914
 
 [FORMAT]
 max-line-length=120
+
+[SIMILARITIES]
+min-similarity-lines=4
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=yes

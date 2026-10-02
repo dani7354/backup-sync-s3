@@ -24,13 +24,13 @@ RUN chown -R root:root "$VENV_PATH" && chmod -R 755 "$VENV_PATH"
 WORKDIR /app
 COPY ./backup_sync_s3 ./backup_sync_s3
 COPY run_backup_sync.py .
-COPY requirements.txt .
+COPY pyproject.toml .
 
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install .
 
 ENV PYTHONPATH="/app"
 RUN chown -R root:root "$PYTHONPATH" && chmod -R 755 "$PYTHONPATH"
 
 USER $UID:$GID
 
-ENTRYPOINT ["python3", "/app/run_backup_sync.py"]
+ENTRYPOINT ["backup-sync-s3"]

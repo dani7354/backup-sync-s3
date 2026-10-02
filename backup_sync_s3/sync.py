@@ -201,6 +201,8 @@ class S3BackupSync:
 
         # Following check prevents the service from uploading a backup that is still being written to disk.
         m_datetime = datetime.fromtimestamp(os.path.getmtime(backup_path))
+        self._logger.debug(
+            "Checking if backup file %s is old enough to upload (%s)...", backup_filename, m_datetime)
         if m_datetime > datetime.now() - timedelta(minutes=self._backup_file_min_age_minutes):
             self._logger.warning(
                 "Backup is modified within the last %d minutes: %s",

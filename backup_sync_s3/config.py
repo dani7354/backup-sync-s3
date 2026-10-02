@@ -17,6 +17,7 @@ ENCODING = "utf-8"
 
 
 class EnvVar(StrEnum):
+    DEBUG = "DEBUG"
     S3_BUCKET_NAME = "S3_BUCKET_NAME"
     S3_ENDPOINT_URL = "S3_ENDPOINT_URL"
     S3_REGION = "S3_REGION"
@@ -46,6 +47,7 @@ def parse_bool_env_var(name: str, default: bool = False) -> bool:
     return value.lower() in ("true", "1")
 
 
+DEBUG = parse_bool_env_var(EnvVar.DEBUG, default=False)
 MULTIPART_MAX_CONCURRENCY = int(os.environ.get(EnvVar.MAX_THREAD_COUNT, DEFAULT_MAX_THREAD_COUNT_FOR_UPLOAD))
 S3_BUCKET_NAME = require_env_var(EnvVar.S3_BUCKET_NAME)
 S3_ENDPOINT_URL = require_env_var(EnvVar.S3_ENDPOINT_URL)

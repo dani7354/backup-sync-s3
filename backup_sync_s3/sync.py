@@ -3,7 +3,7 @@ import os
 import time
 
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import getLogger
 from typing import ClassVar, Sequence, Callable
 from pathlib import Path
@@ -39,6 +39,7 @@ class BackupLocation:
 
 class S3BackupSync:
     _sleep_time_s: ClassVar[int] = 86400
+    _backup_file_min_age_minutes: ClassVar[int] = 5
     _tmp_directory_prefix: ClassVar[str] = "s3-backup-sync"
     _encoding: ClassVar[str] = "utf-8"
     _default_backup_hash: ClassVar[str] = "x"
@@ -180,7 +181,8 @@ class S3BackupSync:
         backups = []
         for file in os.listdir(local_directory_path):
             file_path = os.path.join(local_directory_path, file)
-            if file.startswith(self._invalid_backup_prefixes) or not os.path.isfile(file_path):
+            if not self._local_backup_valid(file_path):
+                self._logger.warning("Local backup file excluded: %s", file_path)
                 continue
 
             file_hash = self._default_hash_func(file_path)
@@ -188,6 +190,24 @@ class S3BackupSync:
             backups.append(Backup(file_path, file_hash, created_time))
 
         return backups
+
+    def _local_backup_valid(self, backup_path: str) -> bool:
+        if not os.path.isfile(backup_path):
+            return False
+
+        backup_filename = os.path.basename(backup_path)
+        if backup_filename.startswith(self._invalid_backup_prefixes):
+            return False
+
+        # Following check prevents the service from uploading a backup that is still being written to disk.
+        m_datetime = datetime.fromtimestamp(os.path.getmtime(backup_path))
+        if m_datetime > datetime.now() - timedelta(minutes=self._backup_file_min_age_minutes):
+            self._logger.warning(
+                "Backup is modified within the last %d minutes: %s",
+                self._backup_file_min_age_minutes, backup_filename)
+            return False
+
+        return True
 
     def _add_to_file_list(
         self,

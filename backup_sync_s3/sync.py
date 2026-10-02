@@ -182,7 +182,7 @@ class S3BackupSync:
         for file in os.listdir(local_directory_path):
             file_path = os.path.join(local_directory_path, file)
             if not self._local_backup_valid(file_path):
-                self._logger.warning("Local backup file excluded: %s", file_path)
+                self._logger.debug("Local backup file excluded: %s", file_path)
                 continue
 
             file_hash = self._default_hash_func(file_path)

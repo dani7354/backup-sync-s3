@@ -11,6 +11,18 @@
 4. Create an environment-specific `docker-compose.live.yml` file with the relevant mounts and paths (defined in `backup.lst`). See `docker-compose.dev.yml` for inspiration.
 5. Start the service: `docker compose -f docker-compose.yml -f docker-compose.live.yml up -d`
 
+## Local development
+
+Install the project and its development tools in a virtual environment:
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+Run the service locally with `backup-sync-s3` after setting the required environment variables.
+
 
 ## Configuration
 

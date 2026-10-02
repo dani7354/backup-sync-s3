@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "backup-sync-s3"
+version = "0.1.0"
+description = "Synchronize local backups to S3-compatible storage"
+requires-python = ">=3.14"
+dependencies = [
+    "boto3",
+    "schedule",
+]
+
+[project.optional-dependencies]
+dev = ["pylint"]
+
+[project.scripts]
+backup-sync-s3 = "run_backup_sync:main"
+
+[tool.setuptools]
+packages = ["backup_sync_s3"]
+py-modules = ["run_backup_sync"]
